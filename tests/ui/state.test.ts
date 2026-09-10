@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_ENVELOPE, expandBlocks, validate } from "@/lib/engine";
-import { CELEBRATION_RATIO, STEP, allowedRange, celebrations, deathSegments, effective, evaluate, firstEditableAge, floorMultiple, initialState, levels, presetContext, reducer, s0FromMonthly, termOf, toEngineInput, type DesignState } from "@/lib/state";
+import { CELEBRATION_RATIO, STEP, allowedRange, parseAgeList, celebrations, deathSegments, effective, evaluate, firstEditableAge, floorMultiple, initialState, levels, presetContext, reducer, s0FromMonthly, termOf, toEngineInput, type DesignState } from "@/lib/state";
 
 describe("초기 상태", () => {
   const s = initialState();
@@ -304,5 +304,12 @@ describe("축하금 10% 규칙", () => {
     let s = reducer(initialState(), { type: "addCelebration", age: 65 });
     s = reducer(s, { type: "addCelebration", age: 65 });
     expect(celebrations(s.blocks)).toHaveLength(1);
+  });
+});
+
+describe("축하금 나이 목록 파싱 (parseAgeList)", () => {
+  it("쉼표·공백 구분, 범위 밖·중복·정수 아님 제외, 오름차순", () => {
+    expect(parseAgeList("65, 55 70,70 abc 30 2.5 120", 40, 111)).toEqual([55, 65, 70]);
+    expect(parseAgeList("", 40, 111)).toEqual([]);
   });
 });

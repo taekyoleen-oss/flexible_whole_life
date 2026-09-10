@@ -78,6 +78,10 @@ export interface AllowedRange { editable: boolean; prev: number; ref: number; st
 /** 드래그 한 번 동안 고정되는 기준: 드래그 시작 시점의 배수 벡터와 변경점 */
 export interface LevelBase { S: number[]; anchors: number[] }
 
+/** 쉼표·공백으로 구분한 나이 목록 → 범위 안의 정수 나이(중복 제거, 오름차순). 축하금 입력용 */
+export const parseAgeList = (text: string, min: number, max: number): number[] =>
+  [...new Set(text.split(/[,\s]+/).filter(Boolean).map(Number).filter((a) => Number.isInteger(a) && a >= min && a <= max))].sort((u, v) => u - v);
+
 /** 첫 편집 연령 뒤·최종연령 안의 유효한 변경점만 오름차순으로 */
 export const cleanAnchors = (anchors: unknown, p: Profile): number[] =>
   [...new Set((Array.isArray(anchors) ? anchors : []).filter((a): a is number => Number.isFinite(a) && a > firstEditableAge(p) && a <= endAgeOf(p)))].sort((u, v) => u - v);
