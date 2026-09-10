@@ -3,7 +3,6 @@ import { expandBlocks } from "./schedule";
 import { premium, type Loading, type PremiumResult } from "./premium";
 import { reserves } from "./reserve";
 import { surrender, type SurrenderResult } from "./surrender";
-import { lowSurrender } from "./lowSurrender";
 import type { AssumptionSet, Contract, EngineInput, Expenses, RateTable } from "./types";
 
 export interface EngineResult {
@@ -17,7 +16,8 @@ export interface EngineResult {
   reserve100k: number[]; reserveStd100k: number[];
   surrender: SurrenderResult;
   expenseFlow: number[];                     // 연도별 사업비(원), t=0..n-1
-  lowSurrender?: { deltaP100k: number; gross100k: number; monthlyGross: number; cash: number[]; rate: number[]; paid: number[] };
+  /** 저해지: 납입기간 중 해약환급금 = 표준 × ratio, 영업보험료 = 표준 × (1 − premiumDiscount). deltaP100k = 10만원당 인하액 */
+  lowSurrender?: { ratio: number; premiumDiscount: number; deltaP100k: number; gross100k: number; monthlyGross: number; cash: number[]; rate: number[]; paid: number[] };
   meta: { assumptionId: string; assumptionVersion: string; waiver: boolean; lowSurrender: boolean };
 }
 
@@ -71,13 +71,13 @@ export function compute(input: EngineInput, a: AssumptionSet, table: RateTable):
     meta: { assumptionId: a.id, assumptionVersion: a.version, waiver, lowSurrender: useLow },
   };
   if (useLow) {
-    const ls = lowSurrender(k, c, V, per100k.newBiz / 1e5, a.lowSurrender);
-    const p2 = premium(k, c, e, ls.deltaP);
-    const gross100k = r0(p2.gross);
-    const cash = ls.cashUnit.map((w) => Math.round(w * input.S0));
+    // 단순 규칙(계획서 §0.6 #23): 납입기간 중 환급금은 표준의 ratio, 보험료는 표준의 (1 − premiumDiscount). 납입 완료 후는 표준과 같다.
+    const { ratio, premiumDiscount } = a.lowSurrender;
+    const gross100k = Math.round(per100k.gross * (1 - premiumDiscount));
+    const cash = sur.cash.map((w, t) => (t < c.payYears ? Math.round(w * ratio) : w));
     const paid = cash.map((_, t) => Math.min(t, c.payYears) * freq * gross100k * units);
     const rate = cash.map((w, t) => (paid[t] > 0 ? w / paid[t] : 0));
-    result.lowSurrender = { deltaP100k: r0(ls.deltaP), gross100k, monthlyGross: gross100k * units, cash, rate, paid };
+    result.lowSurrender = { ratio, premiumDiscount, deltaP100k: per100k.gross - gross100k, gross100k, monthlyGross: gross100k * units, cash, rate, paid };
   }
   return result;
 }

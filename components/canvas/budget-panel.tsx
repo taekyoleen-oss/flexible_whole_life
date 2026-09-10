@@ -36,7 +36,7 @@ export function ContractFields() {
         </Select>
       </Field>
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" className="accent-sky" checked={state.waiver} onChange={(e) => dispatch({ type: "waiver", on: e.target.checked })} />납입면제 (사망·장해 50% 이중탈퇴)</label>
-      <label className="flex items-center gap-2 text-sm"><input type="checkbox" className="accent-sky" checked={state.lowSurrender} onChange={(e) => dispatch({ type: "lowSurrender", on: e.target.checked })} />저해지 (초기 5년 환급금 50%, 보험료 인하)</label>
+      <label className="flex items-center gap-2 text-sm"><input type="checkbox" className="accent-sky" checked={state.lowSurrender} onChange={(e) => dispatch({ type: "lowSurrender", on: e.target.checked })} />저해지 (납입기간 중 해약환급금 30% · 보험료 20% 인하)</label>
     </div>
   );
 }

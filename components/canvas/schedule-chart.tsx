@@ -4,8 +4,19 @@ import { useDesign } from "@/components/design-provider";
 import { Button, Card } from "@/components/ui";
 import { won } from "@/lib/format";
 import { STEP } from "@/lib/state";
+import { BudgetFields } from "./budget-panel";
 import { CelebrationBar } from "./celebration-bar";
 import { ScheduleEditor } from "./schedule-editor";
+
+/** 설계가 끝난 뒤 전체 금액을 비례 조정한다. 배수(비율)는 그대로 두고 기준보험금만 바뀐다 */
+function ScaleSection() {
+  return (
+    <div className="mt-4 rounded border border-navy/10 bg-cream p-3">
+      <div className="mb-2 text-sm font-medium text-navy">전체 금액 조정 <span className="font-normal text-navy/60">· 설계한 비율은 그대로 두고 월 보험료에 맞추거나 기준보험금을 바꿉니다</span></div>
+      <BudgetFields />
+    </div>
+  );
+}
 
 export function ScheduleChart() {
   const { state } = useDesign();
@@ -20,6 +31,7 @@ export function ScheduleChart() {
       </div>
       <ScheduleEditor height={400} amount={amount} />
       <CelebrationBar />
+      <ScaleSection />
       <dialog ref={dlg} className="m-auto w-[min(96vw,1400px)] rounded-lg bg-white p-4 shadow-xl backdrop:bg-navy/50"
         onClick={(e) => { if (e.target === e.currentTarget) e.currentTarget.close(); }}>
         <div className="mb-2 flex items-center justify-between">
@@ -28,6 +40,7 @@ export function ScheduleChart() {
         </div>
         <ScheduleEditor height={560} amount={amount} />
         <CelebrationBar />
+        <ScaleSection />
       </dialog>
     </Card>
   );

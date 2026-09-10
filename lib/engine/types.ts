@@ -41,7 +41,7 @@ export interface AssumptionSet {
   interest: number; standardInterest: number;
   expenses: Expenses;
   waiver: boolean;
-  lowSurrender: { ratio: number; lapse: number };
+  lowSurrender: { ratio: number; premiumDiscount: number };  // 납입기간 중 환급금 비율, 보험료 인하율
   needs: { discount: number; livingRatio: number; selfRatio: number; educationPerChild: number; finalExpense: number; independenceAge: number; retirementAge: number };
 }
 

@@ -13,10 +13,10 @@ export function Evidence() {
   const { state, result: r } = useDesign();
   const eff = effective(r, state.payYears);
   const u = r.perUnit, k = r.per100k;
-  const grossLabel = r.lowSurrender ? `${k.gross.toLocaleString()}원 (저해지 적용 ${r.lowSurrender.gross100k.toLocaleString()}원)` : `${k.gross.toLocaleString()}원`;
-  const netLabel = r.lowSurrender
-    ? `${k.net.toLocaleString()}원 (저해지 적용 ${(k.net - r.lowSurrender.deltaP100k).toLocaleString()}원, 인하 ${r.lowSurrender.deltaP100k}원)`
-    : `${k.net.toLocaleString()}원`;
+  const grossLabel = r.lowSurrender
+    ? `${k.gross.toLocaleString()}원 (저해지 −${Math.round(r.lowSurrender.premiumDiscount * 100)}% → ${r.lowSurrender.gross100k.toLocaleString()}원, 인하 ${r.lowSurrender.deltaP100k}원)`
+    : `${k.gross.toLocaleString()}원`;
+  const netLabel = `${k.net.toLocaleString()}원`;
   const per100k: [string, string][] = [
     ["순보험료", netLabel],
     ["기준연납순보험료", `${k.base.toLocaleString()}원`],
@@ -39,7 +39,7 @@ export function Evidence() {
       <h3 className="mt-3 text-sm font-medium">10만원당 (월납 1회)</h3><Table rows={per100k} />
       <h3 className="mt-3 text-sm font-medium">중간값</h3><Table rows={mid} />
       <h3 className="mt-3 text-sm font-medium">부가보험료 분해 (가입금액 {won(state.S0)} 기준, 1회 납입)</h3><Table rows={loading} />
-      <h3 className="mt-3 text-sm font-medium">해약환급금{eff.isLow ? " (저해지 적용)" : ""}</h3>
+      <h3 className="mt-3 text-sm font-medium">해약환급금{eff.isLow ? ` (저해지: 납입기간 중 표준의 ${Math.round(eff.ratio * 100)}%)` : ""}</h3>
       <table className="w-full text-xs">
         <thead><tr className="text-navy/60"><th className="py-1 text-left">경과</th><th className="text-right">납입 누계</th><th className="text-right">환급금</th><th className="text-right">환급률</th></tr></thead>
         <tbody>{YEARS.filter((t) => t <= r.n).map((t) => <tr key={t} className="border-t border-navy/10 font-mono"><td className="py-1">{t}년</td><td className="text-right">{won(eff.paid[t])}</td><td className="text-right">{won(eff.cash[t])}</td><td className="text-right">{pct(eff.rate[t])}</td></tr>)}</tbody>

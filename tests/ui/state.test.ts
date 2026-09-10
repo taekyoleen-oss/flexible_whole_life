@@ -205,46 +205,79 @@ describe("그래프 단계 편집 (level 액션)", () => {
   it("상수: 1칸 10%, 축하금 10%, 첫 편집 연령 45", () => {
     expect(STEP).toBe(0.1); expect(CELEBRATION_RATIO).toBe(0.1);
     expect(firstEditableAge(s0.profile)).toBe(45);
+    expect(s0.anchors).toEqual([]);
   });
   it("45세 이전은 편집 불가, 45세는 0칸, 50세는 45세부터 5칸", () => {
     expect(allowedRange(s0, 44).editable).toBe(false);
     expect(allowedRange(s0, 45)).toMatchObject({ editable: true, steps: 0, ref: 45, prev: 1, min: 1, max: 1 });
     expect(allowedRange(s0, 50)).toMatchObject({ editable: true, steps: 5, ref: 45, prev: 1, min: 0.5, max: 1.5 });
   });
-  it("50세를 1.7로 올리면 5칸 상한 1.5로 잘리고 50세 이후가 모두 1.5", () => {
+  it("50세를 1.7로 올리면 5칸 상한 1.5로 잘리고, 45~49세가 매년 한 칸씩 오르며, 50세 이후는 1.5", () => {
     const s = reducer(s0, { type: "level", age: 50, multiple: 1.7 });
-    expect(S(s)[9]).toBe(1); expect(S(s)[10]).toBe(1.5); expect(S(s)[69]).toBe(1.5);
+    expect(S(s)[4]).toBe(1);
+    expect(S(s).slice(5, 11)).toEqual([1.1, 1.2, 1.3, 1.4, 1.5, 1.5]);
+    expect(S(s)[69]).toBe(1.5);
     expect(s.presetId).toBe("custom");
+    expect(s.anchors).toEqual([50]);
   });
-  it("60세는 마지막 변경(50세)부터 10칸, E04 상한 3배", () => {
+  it("50세에 3칸만 올리면 47세부터 매년 한 칸씩 오른다", () => {
+    const s = reducer(s0, { type: "level", age: 50, multiple: 1.3 });
+    expect(S(s).slice(5, 11)).toEqual([1, 1, 1.1, 1.2, 1.3, 1.3]);
+    const d = reducer(s0, { type: "level", age: 50, multiple: 0.8 });   // 2칸 내리면 48세부터
+    expect(S(d).slice(5, 11)).toEqual([1, 1, 1, 0.9, 0.8, 0.8]);
+  });
+  it("60세는 마지막 변경점(50세)부터 10칸, E04 상한 3배", () => {
     let s = reducer(s0, { type: "level", age: 50, multiple: 1.5 });
     expect(allowedRange(s, 60)).toMatchObject({ steps: 10, ref: 50, prev: 1.5, min: 0.5, max: 2.5 });
     s = reducer(s, { type: "level", age: 60, multiple: 9 });
-    expect(S(s)[20]).toBe(2.5);
+    expect(S(s).slice(10, 21)).toEqual([1.6, 1.7, 1.8, 1.9, 2, 2.1, 2.2, 2.3, 2.4, 2.5, 2.5]);   // 50~59세 램프, 60세부터 2.5
     s = reducer(s, { type: "level", age: 70, multiple: 9 });   // 10칸이면 3.5지만 상한 3
     expect(S(s)[30]).toBe(3);
+    expect(s.anchors).toEqual([50, 60, 70]);
     expect(allowedRange(s, 55)).toMatchObject({ steps: 5, ref: 50, prev: 1.5 });
   });
-  it("앞 연령을 움직이면 뒤 구간은 같은 폭만큼 함께 움직인다", () => {
+  it("변경점을 다시 움직이면 직전 변경점 기준으로 계산하고, 뒤 구간은 같은 폭만큼 함께 움직인다", () => {
     let s = reducer(s0, { type: "level", age: 50, multiple: 1.5 });
     s = reducer(s, { type: "level", age: 60, multiple: 2.5 });
+    expect(allowedRange(s, 50)).toMatchObject({ ref: 45, prev: 1, steps: 5 });
     s = reducer(s, { type: "level", age: 50, multiple: 1.4 });
-    expect(S(s)[10]).toBe(1.4); expect(S(s)[20]).toBe(2.4);
-    s = reducer(s, { type: "level", age: 50, multiple: 0 });    // 5칸 아래 = 0.5, 뒤 구간도 −0.9
-    expect(S(s)[10]).toBe(0.5); expect(S(s)[20]).toBe(1.5);
+    expect(S(s)[9]).toBe(1.4);    // 49세에 1.4 도달
+    expect(S(s)[10]).toBe(1.5);   // 50세는 60세를 향한 램프의 첫 해(1.4 + 1칸)
+    expect(S(s)[20]).toBe(2.4);   // 60세 변경점은 같은 폭(−0.1)만큼 이동
+    s = reducer(s, { type: "level", age: 50, multiple: 0 });    // 5칸 아래 = 0.5(49세 도달), 뒤 구간도 −0.9
+    expect(S(s).slice(5, 10)).toEqual([0.9, 0.8, 0.7, 0.6, 0.5]);
+    expect(S(s)[10]).toBe(0.6);   // 50세는 60세 변경점을 향한 램프의 첫 해
+    expect(S(s)[20]).toBe(1.5);
+    expect(s.anchors).toEqual([50, 60]);
+  });
+  it("드래그 중에는 시작 시점(base)을 기준으로 계산해 되돌리면 원래대로 돌아온다", () => {
+    const base = { S: levels(s0), anchors: s0.anchors };
+    let s = reducer(s0, { type: "level", age: 50, multiple: 1.3, base });
+    s = reducer(s, { type: "level", age: 50, multiple: 1.5, base });
+    expect(S(s)[10]).toBe(1.5); expect(S(s)[7]).toBe(1.3);
+    s = reducer(s, { type: "level", age: 50, multiple: 1.0, base });
+    expect(S(s)).toEqual(levels(s0));
+    expect(s.anchors).toEqual([]);
   });
   it("하한은 E05 20%와 E06 1,000만원 중 큰 쪽", () => {
     expect(floorMultiple(1e8)).toBe(0.2);
     expect(floorMultiple(2e7)).toBe(0.5);
     const small = reducer(s0, { type: "S0", S0: 2e7 });
     expect(S(reducer(small, { type: "level", age: 50, multiple: 0 }))[10]).toBe(0.5);
-    let s = reducer(s0, { type: "level", age: 60, multiple: 0 });      // 15칸 아래 → 하한 0.2
+    const s = reducer(s0, { type: "level", age: 60, multiple: 0 });      // 15칸 아래 → 하한 0.2
     expect(S(s)[20]).toBe(0.2);
   });
-  it("편집 불가 연령·변화 없음은 같은 상태 참조를 돌려준다", () => {
+  it("편집 불가 연령·변화 없음은 같은 상태 참조를 돌려주고 변경점을 남기지 않는다", () => {
     expect(reducer(s0, { type: "level", age: 44, multiple: 2 })).toBe(s0);
     expect(reducer(s0, { type: "level", age: 45, multiple: 1.3 })).toBe(s0);
     expect(reducer(s0, { type: "level", age: 50, multiple: 1 })).toBe(s0);
+  });
+  it("프리셋·카드 편집은 변경점을 지우고, 연령 변경은 범위 밖 변경점만 버린다", () => {
+    const s = reducer(s0, { type: "level", age: 50, multiple: 1.5 });
+    expect(reducer(s, { type: "preset", id: "level" }).anchors).toEqual([]);
+    expect(reducer(s, { type: "splitSegment", index: 0 }).anchors).toEqual([]);
+    expect(reducer(s, { type: "profile", patch: { age: 48 } }).anchors).toEqual([]);   // 첫 편집 연령 53세보다 앞
+    expect(reducer(s, { type: "profile", patch: { age: 42 } }).anchors).toEqual([50]);
   });
 });
 
@@ -255,7 +288,7 @@ describe("축하금 10% 규칙", () => {
     s = reducer(s, { type: "level", age: 60, multiple: 2.5 });   // 45→60 15칸, 상한 2.5
     expect(celebrations(s.blocks)[0].multiple).toBe(0.25);
     s = reducer(s, { type: "celebration", index: 0, patch: { fromAge: 55 } });
-    expect(celebrations(s.blocks)[0]).toMatchObject({ fromAge: 55, multiple: 0.1 });
+    expect(celebrations(s.blocks)[0]).toMatchObject({ fromAge: 55, multiple: 0.21 });  // 45~59세 램프 중 55세(2.1배)의 10%
   });
   it("같은 나이에 두 번 추가하지 않는다", () => {
     let s = reducer(initialState(), { type: "addCelebration", age: 65 });

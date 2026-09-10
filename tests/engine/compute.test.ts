@@ -47,22 +47,28 @@ describe("G4 정기 형태 = 정기 공식", () => {
   it("순보험료 = M*/N*", () => expect(r.perUnit.net).toBeCloseTo(16212.828499 / 17378602.403207, 12));
 });
 
-describe("I-1 저해지 환급금은 표준 해약공제(newBiz) 기준을 공유한다", () => {
+describe("저해지 규칙: 납입기간 중 환급금 30%, 보험료 20% 인하, 납입 완료 후 표준과 동일", () => {
   const a = ASSUMPTIONS[0];
   const r = compute({ sex: "M", age: 40, payYears: 20, S0: 1e8, lowSurrender: true,
     blocks: [{ fromAge: 40, toAge: 109, multiple: 1, kind: "death" }] }, a, table);
-  it("5년 초과 구간은 표준과 저해지가 (10만원당 반올림 오차 내에서) 일치한다", () => {
-    for (const t of [7, 10, 20]) {
-      expect(Math.abs(r.lowSurrender!.cash[t] - r.surrender.cash[t])).toBeLessThanOrEqual(r.units * 2);
-    }
+  const low = r.lowSurrender!;
+  it("가정 세트 값 0.3 · 0.2가 결과에 실린다", () => {
+    expect(a.lowSurrender).toEqual({ ratio: 0.3, premiumDiscount: 0.2 });
+    expect(low).toMatchObject({ ratio: 0.3, premiumDiscount: 0.2 });
   });
-  it("1~5년은 저해지가 표준의 절반 수준이다", () => {
-    for (let t = 1; t <= 5; t++) {
-      const std = r.surrender.cash[t];
-      const low = r.lowSurrender!.cash[t];
-      if (std === 0 && low === 0) continue;
-      expect(Math.abs(low - 0.5 * std)).toBeLessThanOrEqual(r.units * 2);
-    }
+  it("10만원당 영업보험료는 표준의 80%(원 단위 반올림), 인하액은 그 차이", () => {
+    expect(low.gross100k).toBe(Math.round(r.per100k.gross * 0.8));
+    expect(low.deltaP100k).toBe(r.per100k.gross - low.gross100k);
+    expect(low.monthlyGross).toBe(low.gross100k * r.units);
+  });
+  it("t < 20 환급금은 표준의 30%, t ≥ 20은 표준과 같다", () => {
+    for (const t of [1, 3, 5, 10, 19]) expect(low.cash[t]).toBe(Math.round(r.surrender.cash[t] * 0.3));
+    for (const t of [20, 25, 40]) expect(low.cash[t]).toBe(r.surrender.cash[t]);
+  });
+  it("납입 누계·환급률은 인하된 보험료 기준", () => {
+    expect(low.paid[20]).toBe(20 * 12 * low.gross100k * r.units);
+    expect(low.rate[20]).toBeCloseTo(low.cash[20] / low.paid[20], 12);
+    expect(low.rate[20]).toBeGreaterThan(r.surrender.rate[20]);
   });
 });
 

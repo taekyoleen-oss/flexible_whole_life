@@ -16,7 +16,10 @@ export function PremiumSummary() {
     ["초기 보험금", won(r.S[0] * state.S0)],
     ["최대 보험금", won(Math.max(...r.S) * state.S0)],
   ];
-  if (eff.isLow) rows.push(["표준형 월 영업보험료 (저해지 미적용)", won(eff.standardMonthly)]);
+  if (eff.isLow) {
+    rows.push(["표준형 월 영업보험료 (저해지 미적용)", won(eff.standardMonthly)]);
+    rows.push(["저해지 조건", `납입기간(${m}년) 중 보험료 −${Math.round(eff.premiumDiscount * 100)}% · 해약환급금 ${Math.round(eff.ratio * 100)}%, 이후 표준과 동일`]);
+  }
   return (
     <Card title="보험료">
       <div className="mb-3">

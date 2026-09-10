@@ -22,6 +22,7 @@ export interface DesignState {
   lowSurrender: boolean;
   presetId: PresetId | "custom";
   blocks: Block[];       // death 카드(연속·빈틈 없음) + celebration 카드
+  anchors: number[];     // 그래프에서 직접 정한 변경 연령(오름차순). 이 사이는 매년 한 칸씩 보간된다
   updatedAt: number;     // 0이면 한 번도 편집하지 않은 기본 상태
 }
 
@@ -50,7 +51,7 @@ export function presetContext(p: Profile): PresetContext {
 export function initialState(): DesignState {
   return {
     version: 1, profile: DEFAULT_PROFILE, S0: 1e8, payYears: 20, waiver: true, lowSurrender: false,
-    presetId: "level", blocks: buildPreset("level", presetContext(DEFAULT_PROFILE)), updatedAt: 0,
+    presetId: "level", blocks: buildPreset("level", presetContext(DEFAULT_PROFILE)), anchors: [], updatedAt: 0,
   };
 }
 export const DEFAULT_STATE: DesignState = initialState();
@@ -74,23 +75,29 @@ export const levels = (s: DesignState): number[] => expandBlocks(s.blocks, s.pro
 export const floorMultiple = (S0: number) => Math.max(DEFAULT_ENVELOPE.minMultiple, DEFAULT_ENVELOPE.minAmount / S0);
 
 export interface AllowedRange { editable: boolean; prev: number; ref: number; steps: number; min: number; max: number }
+/** 드래그 한 번 동안 고정되는 기준: 드래그 시작 시점의 배수 벡터와 변경점 */
+export interface LevelBase { S: number[]; anchors: number[] }
+
+/** 첫 편집 연령 뒤·최종연령 안의 유효한 변경점만 오름차순으로 */
+export const cleanAnchors = (anchors: unknown, p: Profile): number[] =>
+  [...new Set((Array.isArray(anchors) ? anchors : []).filter((a): a is number => Number.isFinite(a) && a > firstEditableAge(p) && a <= endAgeOf(p)))].sort((u, v) => u - v);
 
 /**
  * 연령 A에서 그래프로 움직일 수 있는 범위.
- * 기준은 직전 연령(A−1)의 배수 prev이고, prev가 시작된 연령(ref, 최소 firstEditable)부터 A까지 지난 연수만큼 칸(STEP)을 쓸 수 있다.
- * 급격한 증액을 막는 규칙이므로 프리셋이 만든 램프에는 적용하지 않고 수동 편집에만 쓴다.
+ * 기준(ref)은 A보다 앞선 마지막 변경점(없으면 첫 편집 연령 45세), prev는 그 직전 해(ref−1)의 배수(= 직전 변경점이 정한 수준).
+ * 칸 수 = A − ref. 올리거나 내린 k칸은 A 직전 k년(A−k … A−1)에 매년 한 칸씩 놓이고 A부터 새 수준이 된다.
+ * 예: 40세 가입, 50세를 3칸 올리면 47·48·49세가 1.1·1.2·1.3배, 50세부터 1.3배.
  */
-export function allowedRange(s: DesignState, ageAt: number): AllowedRange {
-  const x = s.profile.age, S = levels(s), first = firstEditableAge(s.profile), end = endAgeOf(s.profile);
+export function allowedRange(s: DesignState, ageAt: number, base?: LevelBase): AllowedRange {
+  const x = s.profile.age, S = base?.S ?? levels(s), anchors = base?.anchors ?? s.anchors;
+  const first = firstEditableAge(s.profile), end = endAgeOf(s.profile);
   const t = ageAt - x;
   if (ageAt < first || ageAt > end) {
     const prev = S[clamp(t, 0, S.length - 1)];
     return { editable: false, prev, ref: ageAt, steps: 0, min: prev, max: prev };
   }
-  const prev = S[t - 1];
-  let ref = ageAt - 1;
-  while (ref > x && S[ref - x - 1] === S[ref - x]) ref--;
-  ref = Math.max(ref, first);
+  const ref = anchors.filter((a) => a < ageAt && a >= first).reduce((m, a) => Math.max(m, a), first);
+  const prev = S[ref - x - 1];
   const steps = ageAt - ref;
   return {
     editable: true, prev, ref, steps,
@@ -109,8 +116,10 @@ export function effective(r: EngineResult, payYears: number) {
     isLow: low !== undefined,
     gross100k,
     monthly,
-    net: low ? r.monthly.net - low.deltaP100k * r.units : r.monthly.net,
+    net: r.monthly.net,                       // 순보험료는 표준과 같고 영업보험료만 인하된다
     deltaP100k: low?.deltaP100k ?? 0,
+    ratio: low?.ratio ?? 1,
+    premiumDiscount: low?.premiumDiscount ?? 0,
     totalPaid: paid[Math.min(payYears, paid.length - 1)],
     cash: low?.cash ?? r.surrender.cash,
     rate: low?.rate ?? r.surrender.rate,
@@ -189,7 +198,7 @@ export type Action =
   | { type: "addCelebration"; age: number }
   | { type: "celebration"; index: number; patch: { fromAge: number } }
   | { type: "removeCelebration"; index: number }
-  | { type: "level"; age: number; multiple: number }
+  | { type: "level"; age: number; multiple: number; base?: LevelBase }
   | { type: "autoFix"; code: AutoFixCode };
 
 export function reducer(s: DesignState, a: Action): DesignState {
@@ -202,12 +211,13 @@ export function reducer(s: DesignState, a: Action): DesignState {
       const merged: DesignState = { ...DEFAULT_STATE, ...raw, profile };
       const payYears = clamp(Math.round(Number(merged.payYears)), 1, termOf(profile));
       const S0 = clamp(Math.round(Number(merged.S0)), 1e6, 1e10);
-      return { ...withBlocks({ ...merged, payYears, S0 }, deathSegments(blocks), celebrations(blocks)), updatedAt: merged.updatedAt };
+      const anchors = cleanAnchors(merged.anchors, profile);
+      return { ...withBlocks({ ...merged, payYears, S0, anchors }, deathSegments(blocks), celebrations(blocks)), updatedAt: merged.updatedAt };
     }
     case "reset": return initialState();
     case "profile": {
       const profile = clampProfile({ ...s.profile, ...a.patch });
-      const next = { ...s, profile };
+      const next = { ...s, profile, anchors: cleanAnchors(s.anchors, profile) };
       const deaths = s.presetId === "custom" ? deathSegments(s.blocks) : buildPreset(s.presetId, presetContext(profile));
       return withBlocks(next, deaths, celebrations(s.blocks));
     }
@@ -215,7 +225,7 @@ export function reducer(s: DesignState, a: Action): DesignState {
     case "payYears": return touch({ payYears: clamp(Math.round(a.payYears), 1, termOf(s.profile)) });
     case "waiver": return touch({ waiver: a.on });
     case "lowSurrender": return touch({ lowSurrender: a.on });
-    case "preset": return withBlocks(s, buildPreset(a.id, presetContext(s.profile)), celebrations(s.blocks), a.id);
+    case "preset": return withBlocks({ ...s, anchors: [] }, buildPreset(a.id, presetContext(s.profile)), celebrations(s.blocks), a.id);
     case "segment": {
       if (!deathSegments(s.blocks)[a.index]) return s;
       const d = deathSegments(s.blocks).map((b, i) => i !== a.index ? b : {
@@ -223,7 +233,7 @@ export function reducer(s: DesignState, a: Action): DesignState {
         toAge: a.patch.toAge === undefined ? b.toAge : Math.round(a.patch.toAge),
         multiple: a.patch.multiple === undefined ? b.multiple : clamp(a.patch.multiple, 0, 10),
       });
-      return withBlocks(s, d, celebrations(s.blocks), "custom");
+      return withBlocks({ ...s, anchors: [] }, d, celebrations(s.blocks), "custom");
     }
     case "splitSegment": {
       const d = deathSegments(s.blocks);
@@ -231,14 +241,14 @@ export function reducer(s: DesignState, a: Action): DesignState {
       if (!b || b.toAge - b.fromAge < 1) return s;
       const mid = Math.floor((b.fromAge + b.toAge) / 2);
       d.splice(a.index, 1, { ...b, toAge: mid }, { ...b, fromAge: mid + 1 });
-      return withBlocks(s, d, celebrations(s.blocks), "custom");
+      return withBlocks({ ...s, anchors: [] }, d, celebrations(s.blocks), "custom");
     }
     case "removeSegment": {
       const d = deathSegments(s.blocks);
       if (d.length < 2 || !d[a.index]) return s;
       if (a.index > 0) d[a.index - 1] = { ...d[a.index - 1], toAge: d[a.index].toAge };
       d.splice(a.index, 1);
-      return withBlocks(s, d, celebrations(s.blocks), "custom");
+      return withBlocks({ ...s, anchors: [] }, d, celebrations(s.blocks), "custom");
     }
     case "addCelebration": {
       const c: Block = { fromAge: Math.round(a.age), toAge: Math.round(a.age), multiple: 0, kind: "celebration" };
@@ -252,14 +262,28 @@ export function reducer(s: DesignState, a: Action): DesignState {
     case "removeCelebration":
       return withBlocks(s, deathSegments(s.blocks), celebrations(s.blocks).filter((_, i) => i !== a.index));
     case "level": {
-      const r = allowedRange(s, a.age);
+      const r = allowedRange(s, a.age, a.base);
       if (!r.editable) return s;
+      const x = s.profile.age, n = termOf(s.profile);
+      const S = a.base && a.base.S.length === n ? a.base.S : levels(s);
+      const anchors0 = a.base?.anchors ?? s.anchors;
       const target = r4(clamp(a.multiple, r.min, r.max));
-      const S = levels(s), t = a.age - s.profile.age, delta = r4(target - S[t]);
-      if (delta === 0) return s;
+      const t = a.age - x, tRef = r.ref - x;
+      // 변경점 A의 수준은 A−1에 도달한 값이다. 뒤 구간은 그 수준의 변화폭만큼 함께 움직인다
+      const delta = r4(target - S[t - 1]);
       const lo = floorMultiple(s.S0), hi = DEFAULT_ENVELOPE.maxMultiple;
-      const next = S.map((v, i) => (i >= t ? r4(clamp(v + delta, lo, hi)) : v));
-      return withBlocks(s, toBlocks(next, s.profile.age), celebrations(s.blocks), "custom");
+      const next = S.slice();
+      // ref~A−1: prev로 두었다가 A 직전 k년 동안 매년 한 칸씩 target까지 계단식으로 이동
+      const k = Math.round(Math.abs(target - r.prev) / STEP), sign = Math.sign(target - r.prev);
+      for (let i = tRef; i < t; i++) next[i] = i < t - k ? r.prev : r4(r.prev + sign * STEP * (i - (t - k) + 1));
+      // A 이후: 같은 폭만큼 함께 이동, 상·하한에서 정지
+      for (let i = t; i < n; i++) next[i] = r4(clamp(S[i] + delta, lo, hi));
+      const unchangedFromBase = next.every((v, i) => v === S[i]);
+      const anchors = unchangedFromBase ? anchors0 : cleanAnchors([...anchors0, a.age], s.profile);
+      const cur = levels(s);
+      const same = next.every((v, i) => v === cur[i]) && anchors.length === s.anchors.length && anchors.every((v, i) => v === s.anchors[i]);
+      if (same) return s;
+      return withBlocks({ ...s, anchors }, toBlocks(next, x), celebrations(s.blocks), "custom");
     }
     case "autoFix": {
       const d = deathSegments(s.blocks);
@@ -269,7 +293,7 @@ export function reducer(s: DesignState, a: Action): DesignState {
         const { minMultiple, maxMultiple } = DEFAULT_ENVELOPE;
         for (let i = 0; i < d.length; i++) d[i] = { ...d[i], multiple: clamp(d[i].multiple, minMultiple, maxMultiple) };
       }
-      return withBlocks(s, d, celebrations(s.blocks), "custom");
+      return withBlocks({ ...s, anchors: [] }, d, celebrations(s.blocks), "custom");
     }
   }
 }

@@ -4,7 +4,6 @@ export { expandBlocks, toBlocks } from "./schedule";
 export { premium, pvBenefit, nStar, round5, type PremiumResult, type Loading } from "./premium";
 export { reserves } from "./reserve";
 export { surrender, type SurrenderResult } from "./surrender";
-export { lowSurrender, LOW_SURRENDER_YEARS, type LowSurrenderResult } from "./lowSurrender";
 export { compute, type EngineResult } from "./compute";
 export { ASSUMPTIONS, getAssumption } from "./assumptions";
 export { PRESETS, buildPreset, FIX_YEARS, type PresetId, type PresetContext } from "./presets";

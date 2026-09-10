@@ -3,10 +3,12 @@ import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } fr
 import { useDesign } from "@/components/design-provider";
 import { DEFAULT_ENVELOPE } from "@/lib/engine";
 import { won } from "@/lib/format";
-import { allowedRange, celebrations, endAgeOf, firstEditableAge, STEP } from "@/lib/state";
+import { allowedRange, celebrations, endAgeOf, firstEditableAge, STEP, type LevelBase } from "@/lib/state";
 
 const M = { left: 64, right: 16, top: 18, bottom: 28 };
 const r4 = (x: number) => Math.round(x * 1e4) / 1e4;
+/** 선·면 위에서도 읽히도록 글자에 흰 테두리를 두른다 */
+const halo = { paintOrder: "stroke" as const, stroke: "#ffffff", strokeWidth: 3, strokeLinejoin: "round" as const };
 
 /** 컨테이너 폭을 ResizeObserver로 읽는다 */
 function useWidth<T extends HTMLElement>() {
@@ -31,7 +33,7 @@ export function ScheduleEditor({ height, amount }: { height: number; amount: boo
   const [box, width] = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<number | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
-  const drag = useRef<number | null>(null);
+  const drag = useRef<{ age: number; base: LevelBase } | null>(null);
 
   const x0 = state.profile.age, n = result.n, S = result.S, S0 = state.S0;
   const first = firstEditableAge(state.profile), endAge = endAgeOf(state.profile);
@@ -49,26 +51,25 @@ export function ScheduleEditor({ height, amount }: { height: number; amount: boo
   const area = `${line} L${xs(x0 + n)},${ys(0)} L${xs(x0)},${ys(0)} Z`;
 
   const pos = (e: PointerEvent<SVGSVGElement>) => { const r = e.currentTarget.getBoundingClientRect(); return { px: e.clientX - r.left, py: e.clientY - r.top }; };
-  /** 포인터 y → prev 기준 칸 수로 양자화해 dispatch. 범위 밖은 리듀서가 자른다 */
-  const moveTo = (age: number, py: number) => {
-    const r = allowedRange(state, age);
+  /** 포인터 y → prev 기준 칸 수로 양자화해 dispatch. 드래그 시작 시점(base)을 기준으로 계산하므로 되돌리면 원래대로 온다 */
+  const moveTo = (age: number, py: number, base: LevelBase) => {
+    const r = allowedRange(state, age, base);
     if (!r.editable) return;
     const k = Math.round((levelAt(py) - r.prev) / STEP);
-    dispatch({ type: "level", age, multiple: r.prev + k * STEP });
+    dispatch({ type: "level", age, multiple: r.prev + k * STEP, base });
   };
+  /** 클릭은 선택만 한다. 값은 움직일 때(onMove)만 바뀐다 */
   const onDown = (e: PointerEvent<SVGSVGElement>) => {
-    const { px, py } = pos(e);
-    const age = ageAt(px);
+    const age = ageAt(pos(e).px);
     setSelected(age);
     e.currentTarget.focus({ preventScroll: true });
     if (age < first) return;
-    drag.current = age;
+    drag.current = { age, base: { S: S.slice(), anchors: state.anchors } };
     e.currentTarget.setPointerCapture(e.pointerId);
-    moveTo(age, py);
   };
   const onMove = (e: PointerEvent<SVGSVGElement>) => {
     const { px, py } = pos(e);
-    if (drag.current !== null) moveTo(drag.current, py);
+    if (drag.current) moveTo(drag.current.age, py, drag.current.base);
     else setHover(ageAt(px));
   };
   const onUp = (e: PointerEvent<SVGSVGElement>) => {
@@ -85,8 +86,8 @@ export function ScheduleEditor({ height, amount }: { height: number; amount: boo
     e.preventDefault();
   };
 
-  const focus = drag.current ?? selected ?? hover;
-  const range = focus === null ? null : allowedRange(state, focus);
+  const focus = drag.current?.age ?? selected ?? hover;
+  const range = focus === null ? null : allowedRange(state, focus, drag.current?.base);
   const cels = celebrations(state.blocks);
   const gridLevels = Array.from({ length: Math.round(yMax / STEP) + 1 }, (_, i) => r4(i * STEP));
   const xTicks: number[] = [];
@@ -101,7 +102,6 @@ export function ScheduleEditor({ height, amount }: { height: number; amount: boo
         onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
         onPointerLeave={() => setHover(null)} onKeyDown={onKey}>
         <rect x={xs(x0)} y={M.top} width={xs(first) - xs(x0)} height={ph} fill="#4a90c2" fillOpacity={0.1} />
-        <text x={xs(x0) + 6} y={M.top + 14} fontSize={11} fill="#1b2845">초기 고정 {x0}~{first - 1}세</text>
         {gridLevels.map((m) => (
           <line key={m} x1={M.left} x2={W - M.right} y1={ys(m)} y2={ys(m)} stroke="#1b2845" strokeOpacity={Math.round(m * 10) % 5 === 0 ? 0.15 : 0.05} />
         ))}
@@ -118,10 +118,16 @@ export function ScheduleEditor({ height, amount }: { height: number; amount: boo
         ))}
         <path d={area} fill="#1b2845" fillOpacity={0.06} />
         <path d={line} fill="none" stroke="#1b2845" strokeWidth={2.5} />
+        {state.anchors.map((a) => (
+          <rect key={a} x={xs(a) - 4} y={ys(at(a)) - 4} width={8} height={8} transform={`rotate(45 ${xs(a)} ${ys(at(a))})`} fill="#1b2845" stroke="#fff" strokeWidth={1.5}>
+            <title>{a}세 변경점</title>
+          </rect>
+        ))}
+        <text x={xs(x0) + 6} y={M.top + 14} fontSize={11} fill="#1b2845" {...halo}>초기 고정 {x0}~{first - 1}세</text>
         {cels.map((c) => (
           <g key={c.fromAge}>
             <circle cx={xs(c.fromAge)} cy={ys(at(c.fromAge))} r={6} fill="#4a90c2" stroke="#fff" strokeWidth={2} />
-            <text x={xs(c.fromAge)} y={ys(at(c.fromAge)) - 12} fontSize={11} textAnchor="middle" fill="#1b2845">축하금 {won(c.multiple * S0)}</text>
+            <text x={xs(c.fromAge)} y={ys(at(c.fromAge)) - 12} fontSize={11} textAnchor="middle" fill="#1b2845" {...halo}>축하금 {won(c.multiple * S0)}</text>
           </g>
         ))}
         {focus !== null && range && (
@@ -129,9 +135,9 @@ export function ScheduleEditor({ height, amount }: { height: number; amount: boo
             <line x1={xs(focus)} x2={xs(focus)} y1={M.top} y2={M.top + ph} stroke="#4a90c2" strokeDasharray="3 3" />
             {range.editable && <rect x={xs(focus) - 3} y={ys(range.max)} width={6} height={Math.max(2, ys(range.min) - ys(range.max))} rx={3} fill="#4a90c2" fillOpacity={0.35} />}
             <circle cx={xs(focus)} cy={ys(at(focus))} r={5} fill="#fff" stroke="#4a90c2" strokeWidth={2} />
-            <text x={Math.min(xs(focus) + 8, W - 170)} y={Math.max(M.top + 12, ys(at(focus)) - 10)} fontSize={12} fontWeight={600} fill="#1b2845">{focus}세 {label(at(focus))}</text>
-            <text x={Math.min(xs(focus) + 8, W - 170)} y={Math.max(M.top + 26, ys(at(focus)) + 4)} fontSize={11} fill={range.editable ? "#1b2845" : "#b91c1c"}>
-              {range.editable ? `${range.ref}세부터 ${range.steps}년 → ±${range.steps}칸` : "고정 구간 (편집 불가)"}
+            <text x={Math.min(xs(focus) + 8, W - 190)} y={Math.max(M.top + 30, ys(at(focus)) - 10)} fontSize={12} fontWeight={600} fill="#1b2845" {...halo}>{focus}세 {label(at(focus))}</text>
+            <text x={Math.min(xs(focus) + 8, W - 190)} y={Math.max(M.top + 44, ys(at(focus)) + 4)} fontSize={11} fill={range.editable ? "#1b2845" : "#b91c1c"} {...halo}>
+              {range.editable ? `${range.ref}세 변경점부터 ${range.steps}년 → ±${range.steps}칸` : "고정 구간 (편집 불가)"}
             </text>
           </g>
         )}
