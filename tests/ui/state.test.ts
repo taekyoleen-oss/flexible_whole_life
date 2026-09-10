@@ -243,21 +243,36 @@ describe("그래프 단계 편집 (level 액션)", () => {
     s = reducer(s, { type: "level", age: 70, multiple: 9 });   // 10칸이면 3.5지만 상한 3
     expect(S(s)[30]).toBe(3);
     expect(s.anchors).toEqual([50, 60, 70]);
-    expect(allowedRange(s, 55)).toMatchObject({ steps: 5, ref: 50, prev: 1.5 });
+    expect(allowedRange(s, 55)).toMatchObject({ steps: 5, ref: 50, prev: 2.1 });   // prev = 지금 55세 값
   });
-  it("변경점을 다시 움직이면 직전 변경점 기준으로 계산하고, 뒤 구간은 같은 폭만큼 함께 움직인다", () => {
+  it("변경점을 다시 움직이면 지금 값 기준 ±칸 수이고, 기존 모양 위에 변화폭이 더해져 뒤 구간도 함께 움직인다", () => {
     let s = reducer(s0, { type: "level", age: 50, multiple: 1.5 });
     s = reducer(s, { type: "level", age: 60, multiple: 2.5 });
-    expect(allowedRange(s, 50)).toMatchObject({ ref: 45, prev: 1, steps: 5 });
-    s = reducer(s, { type: "level", age: 50, multiple: 1.4 });
-    expect(S(s)[9]).toBe(1.4);    // 49세에 1.4 도달
-    expect(S(s)[10]).toBe(1.5);   // 50세는 60세를 향한 램프의 첫 해(1.4 + 1칸)
+    expect(allowedRange(s, 50)).toMatchObject({ ref: 45, prev: 1.6, steps: 5, min: 1.1, max: 2.1 });   // 50세는 60세를 향한 램프의 첫 해(1.6)
+    s = reducer(s, { type: "level", age: 50, multiple: 1.5 });   // Δ = −0.1: 49세에만 −0.1, 50세부터 −0.1
+    expect(S(s).slice(5, 11)).toEqual([1.1, 1.2, 1.3, 1.4, 1.4, 1.5]);
     expect(S(s)[20]).toBe(2.4);   // 60세 변경점은 같은 폭(−0.1)만큼 이동
-    s = reducer(s, { type: "level", age: 50, multiple: 0 });    // 5칸 아래 = 0.5(49세 도달), 뒤 구간도 −0.9
-    expect(S(s).slice(5, 10)).toEqual([0.9, 0.8, 0.7, 0.6, 0.5]);
-    expect(S(s)[10]).toBe(0.6);   // 50세는 60세 변경점을 향한 램프의 첫 해
-    expect(S(s)[20]).toBe(1.5);
+    s = reducer(s, { type: "level", age: 50, multiple: 0 });    // 하한 1.5 − 5칸 = 1.0: 45~49세에 −0.1…−0.5, 뒤 구간 −0.5
+    expect(S(s).slice(5, 11)).toEqual([1, 1, 1, 1, 0.9, 1]);
+    expect(S(s)[20]).toBe(1.9);
     expect(s.anchors).toEqual([50, 60]);
+  });
+  it("프리셋 모양은 유지된 채 편집된다: 자녀연령형 65세 +3칸", () => {
+    const c = reducer(s0, { type: "preset", id: "child" });   // 표준: 54~60세 0.9→0.3
+    expect(S(c).slice(13, 22)).toEqual([1, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.3]);
+    expect(allowedRange(c, 65)).toMatchObject({ ref: 45, prev: 0.3, steps: 20, min: 0.2, max: 2.3 });
+    const s = reducer(c, { type: "level", age: 65, multiple: 0.6 });
+    expect(S(s).slice(13, 22)).toEqual([1, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.3]);   // 감액 계단 그대로
+    expect(S(s).slice(22, 27)).toEqual([0.4, 0.5, 0.6, 0.6, 0.6]);   // 62·63·64세 램프, 65세부터 +0.3
+    expect(S(s)[69]).toBe(0.6);
+    expect(s.presetId).toBe("custom"); expect(s.anchors).toEqual([65]);
+    // 은퇴증액형: 0.1 단위가 아닌 값 위에서도 되돌리면 원래대로
+    const r = reducer(s0, { type: "preset", id: "retire" });
+    const base = { S: levels(r), anchors: r.anchors };
+    let e = reducer(r, { type: "level", age: 70, multiple: levels(r)[30] + 0.2, base });
+    expect(S(e)[30]).toBeCloseTo(levels(r)[30] + 0.2, 4);
+    e = reducer(e, { type: "level", age: 70, multiple: levels(r)[30], base });
+    expect(S(e)).toEqual(levels(r));
   });
   it("드래그 중에는 시작 시점(base)을 기준으로 계산해 되돌리면 원래대로 돌아온다", () => {
     const base = { S: levels(s0), anchors: s0.anchors };

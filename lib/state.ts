@@ -145,9 +145,9 @@ export const cleanAnchors = (anchors: unknown, p: Profile, env: EnvelopeParams =
 
 /**
  * 연령 A에서 그래프로 움직일 수 있는 범위.
- * 기준(ref)은 A보다 앞선 마지막 변경점(없으면 첫 편집 연령 45세), prev는 그 직전 해(ref−1)의 배수(= 직전 변경점이 정한 수준).
- * 칸 수 = A − ref. 올리거나 내린 k칸은 A 직전 k년(A−k … A−1)에 매년 한 칸씩 놓이고 A부터 새 수준이 된다.
- * 예: 40세 가입, 50세를 3칸 올리면 47·48·49세가 1.1·1.2·1.3배, 50세부터 1.3배.
+ * 기준(ref)은 A보다 앞선 마지막 변경점(없으면 첫 편집 연령 45세), prev는 지금 A의 배수(드래그 시작 값).
+ * 칸 수 = A − ref. 프리셋 모양은 그대로 두고 그 위에 변화폭을 더한다: 올리거나 내린 k칸은 A 직전 k년(A−k … A−1)에
+ * 매년 한 칸씩 더해지고 A부터는 같은 폭(Δ)이 더해진다. 예: 평준형 40세 가입, 50세를 3칸 올리면 47·48·49세가 1.1·1.2·1.3배, 50세부터 1.3배.
  */
 export function allowedRange(s: DesignState, ageAt: number, base?: LevelBase): AllowedRange {
   const x = s.profile.age, S = base?.S ?? levels(s), anchors = base?.anchors ?? s.anchors;
@@ -159,7 +159,7 @@ export function allowedRange(s: DesignState, ageAt: number, base?: LevelBase): A
     return { editable: false, prev, ref: ageAt, steps: 0, min: prev, max: prev };
   }
   const ref = anchors.filter((a) => a < ageAt && a >= first).reduce((m, a) => Math.max(m, a), first);
-  const prev = S[ref - x - 1];
+  const prev = S[t];
   const steps = ageAt - ref;
   return {
     editable: true, prev, ref, steps,
@@ -363,14 +363,14 @@ export function reducer(s: DesignState, a: Action): DesignState {
       const S = a.base && a.base.S.length === n ? a.base.S : levels(s);
       const anchors0 = a.base?.anchors ?? s.anchors;
       const target = r4(clamp(a.multiple, r.min, r.max));
-      const t = a.age - x, tRef = r.ref - x;
-      // 변경점 A의 수준은 A−1에 도달한 값이다. 뒤 구간은 그 수준의 변화폭만큼 함께 움직인다
-      const delta = r4(target - S[t - 1]);
+      const t = a.age - x;
+      // 기존 모양(프리셋·이전 편집)은 그대로 두고 변화폭 Δ = target − 지금 A의 값을 더한다
+      const delta = r4(target - S[t]);
       const lo = floorMultiple(s.S0, envelopeOf(s)), hi = envelopeOf(s).maxMultiple;
       const next = S.slice();
-      // ref~A−1: prev로 두었다가 A 직전 k년 동안 매년 한 칸씩 target까지 계단식으로 이동
-      const k = Math.round(Math.abs(target - r.prev) / STEP), sign = Math.sign(target - r.prev);
-      for (let i = tRef; i < t; i++) next[i] = i < t - k ? r.prev : r4(r.prev + sign * STEP * (i - (t - k) + 1));
+      // A 직전 k년: 매년 한 칸씩 Δ까지 계단식으로 더한다(칸 수 제한으로 k ≤ A − ref)
+      const k = Math.ceil(Math.abs(delta) / STEP - 1e-9), sign = Math.sign(delta);
+      for (let j = 0; j < k; j++) next[t - k + j] = r4(clamp(S[t - k + j] + sign * Math.min(STEP * (j + 1), Math.abs(delta)), lo, hi));
       // A 이후: 같은 폭만큼 함께 이동, 상·하한에서 정지
       for (let i = t; i < n; i++) next[i] = r4(clamp(S[i] + delta, lo, hi));
       const unchangedFromBase = next.every((v, i) => v === S[i]);
