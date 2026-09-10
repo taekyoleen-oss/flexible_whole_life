@@ -19,13 +19,17 @@ describe("프리셋 6종", () => {
     const { S } = expandBlocks(buildPreset("child", ctx), 40, 70);
     expect(S[15]).toBe(1); expect(S[16]).toBe(0.9); expect(S[21]).toBe(0.4); expect(S[22]).toBe(0.3); expect(S[23]).toBe(0.3);
   });
-  it("단체보험보완형: 60세에 1.0 도달", () => {
+  it("단체보험보완형: 퇴직(60세) 5년 전부터 매년 0.1씩 올라 59세에 1.0", () => {
     const { S } = expandBlocks(buildPreset("group", ctx), 40, 70);
-    expect(S[15]).toBe(0.5); expect(S[20]).toBe(1); expect(S[16]).toBeCloseTo(0.6, 12);
+    expect(S[14]).toBe(0.5); expect(S[15]).toBeCloseTo(0.6, 12); expect(S[19]).toBe(1); expect(S[20]).toBe(1);
   });
-  it("상속준비형: 5년 후 체증, 2.0 상한", () => {
+  it("은퇴증액형: 은퇴(65세) 5년 전부터 매년 0.1씩 올라 64세에 1.5", () => {
+    const { S } = expandBlocks(buildPreset("retire", ctx), 40, 70);
+    expect(S[19]).toBe(1); expect(S[20]).toBeCloseTo(1.1, 12); expect(S[24]).toBe(1.5); expect(S[25]).toBe(1.5);
+  });
+  it("상속준비형: 5년 후 매년 0.1씩 체증, 15년 뒤 2.0 상한", () => {
     const { S } = expandBlocks(buildPreset("estate", ctx), 40, 70);
-    expect(S[4]).toBe(0.5); expect(S[5]).toBeCloseTo(0.55, 12); expect(Math.max(...S)).toBe(2);
+    expect(S[4]).toBe(0.5); expect(S[5]).toBeCloseTo(0.6, 12); expect(S[19]).toBe(2); expect(Math.max(...S)).toBe(2);
   });
 });
 

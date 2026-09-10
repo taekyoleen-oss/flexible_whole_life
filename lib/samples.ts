@@ -8,7 +8,7 @@ export const SAMPLES: Sample[] = [
     profile: { sex: "M", age: 35, childrenAges: [2, 5], income: 7e7 }, presetId: "child" },
   { id: "debt-45f", label: "45세 여 · 부채상환형", description: "대출 잔액 3억·만기 15년, 월 30만원. 만기까지 선형 감액 후 30%", monthly: 3e5,
     profile: { sex: "F", age: 45, childrenAges: [15], income: 8e7, debt: 3e8, debtYears: 15 }, presetId: "debt" },
-  { id: "estate-55m", label: "55세 남 · 상속준비형", description: "월 50만원. 초기 50%에서 연 10% 체증, 최대 2배", monthly: 5e5,
+  { id: "estate-55m", label: "55세 남 · 상속준비형", description: "월 50만원. 초기 50%에서 매년 10%씩 체증, 최대 2배", monthly: 5e5,
     profile: { sex: "M", age: 55, childrenAges: [25, 28], income: 1e8, liquidAssets: 5e8 }, presetId: "estate" },
 ];
 

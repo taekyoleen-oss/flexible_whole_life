@@ -142,7 +142,7 @@ export function ScheduleEditor({ height, amount, readOnly = false }: { height: n
             <circle cx={xs(focus)} cy={ys(at(focus))} r={5} fill="#fff" stroke="#4a90c2" strokeWidth={2} />
             <text x={Math.min(xs(focus) + 8, W - 190)} y={Math.max(M.top + 30, ys(at(focus)) - 10)} fontSize={12} fontWeight={600} fill="#1b2845" {...halo}>{focus}세 {label(at(focus))}</text>
             <text x={Math.min(xs(focus) + 8, W - 190)} y={Math.max(M.top + 44, ys(at(focus)) + 4)} fontSize={11} fill={range.editable ? "#1b2845" : "#b91c1c"} {...halo}>
-              {range.editable ? `${range.ref}세부터 ${range.steps}년 → ↑${range.steps}칸 · ↓${range.min}배까지` : "고정 구간 (편집 불가)"}
+              {range.editable ? `${range.ref}세 기준 ±${range.steps}칸 (${range.min}~${range.max}배)` : "고정 구간 (편집 불가)"}
             </text>
           </g>
         )}

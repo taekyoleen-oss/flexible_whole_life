@@ -145,9 +145,10 @@ export const cleanAnchors = (anchors: unknown, p: Profile, env: EnvelopeParams =
 
 /**
  * 연령 A에서 그래프로 움직일 수 있는 범위.
- * 기준(ref)은 A보다 앞선 마지막 변경점(없으면 첫 편집 연령 45세), prev는 지금 A의 배수(드래그 시작 값), 칸 수 = A − ref.
- * 올리기는 칸 수만큼(매년 한 칸, E02 증가율 제한), 내리기는 증가율 제한이 없으므로 하한(E05 20%·E06 1천만원)까지.
- * A 이후는 기존 모양 위에 같은 폭(Δ)을 더하고, A 직전 구간은 ref 이후 연도에 고르게 나눠 A−1에서 새 값에 닿는다(level 액션).
+ * 기준(ref)은 A보다 앞선 마지막 변경점(없으면 첫 편집 연령 45세), 칸 수 = A − ref, level0 = ref 직전 해의 배수(직전 변경점이 정한 수준).
+ * 허용 범위 = level0 ± 칸 수 × 0.1 (상한 3배·하한 E05 20%·E06 1천만원). 올리기·내리기 모두 매년 최대 한 칸(10%)씩만 움직인다.
+ * prev는 지금 A의 배수(드래그 시작 값)로, 편집기가 이동량을 재는 기준이다. A 이후는 기존 모양 위에 같은 폭(Δ)을 더하고,
+ * A 직전은 매년 한 칸을 넘지 않는 가장 짧은 램프로 그 전해 값에서 새 값까지 잇는다(level 액션).
  */
 export function allowedRange(s: DesignState, ageAt: number, base?: LevelBase): AllowedRange {
   const x = s.profile.age, S = base?.S ?? levels(s), anchors = base?.anchors ?? s.anchors;
@@ -161,10 +162,12 @@ export function allowedRange(s: DesignState, ageAt: number, base?: LevelBase): A
   const ref = anchors.filter((a) => a < ageAt && a >= first).reduce((m, a) => Math.max(m, a), first);
   const prev = S[t];
   const steps = ageAt - ref;
+  const level0 = S[ref - x - 1];
+  // 지금 값은 항상 범위 안에 둔다(프리셋 모양이 범위 밖에 있어도 손대지 않으면 그대로)
   return {
     editable: true, prev, ref, steps,
-    min: steps === 0 ? prev : r4(Math.min(prev, floorMultiple(s.S0, env))),
-    max: r4(Math.min(env.maxMultiple, prev + steps * STEP)),
+    min: r4(Math.min(prev, Math.max(floorMultiple(s.S0, env), level0 - steps * STEP))),
+    max: r4(Math.max(prev, Math.min(env.maxMultiple, level0 + steps * STEP))),
   };
 }
 
@@ -385,11 +388,16 @@ export function reducer(s: DesignState, a: Action): DesignState {
       const delta = r4(target - S[t]);
       const lo = floorMultiple(s.S0, envelopeOf(s)), hi = envelopeOf(s).maxMultiple;
       const next = S.slice();
-      for (let i = t; i < n; i++) next[i] = r4(clamp(S[i] + delta, lo, hi));
-      // A 직전: 한 칸(10%)에 1년씩, 연도가 모자라면(내릴 때) ref 이후 연도 전부에 고르게 나눠 A−1에서 target에 닿는다
-      const k = Math.min(Math.ceil(Math.abs(delta) / STEP - 1e-9), t - tRef);
-      const r0 = t - k, from = S[r0 - 1];
-      for (let i = r0; i < t; i++) next[i] = r4(clamp(from + ((target - from) * (i - r0 + 1)) / k, lo, hi));
+      if (delta !== 0) {
+        for (let i = t; i < n; i++) next[i] = r4(clamp(S[i] + delta, lo, hi));
+        // A 직전 k년: 한 칸에 1년(k ≥ |Δ|/0.1)이되, 그 전해 값(from)에서 target까지 매년 한 칸을 넘으면 더 길게 잡는다.
+        // 범위가 level0 ± 칸 수라 k = 칸 수면 항상 가능하다. 되돌리는 드래그는 k = |Δ|/0.1이 이전 램프를 그대로 덮어 원래 모양으로 돌아온다
+        let k = Math.max(1, Math.ceil(Math.abs(delta) / STEP - 1e-9));
+        while (k < t - tRef && Math.abs(target - S[t - k - 1]) > STEP * k + 1e-9) k++;
+        k = Math.min(k, t - tRef);
+        const r0 = t - k, from = S[r0 - 1];
+        for (let i = r0; i < t; i++) next[i] = r4(clamp(from + ((target - from) * (i - r0 + 1)) / k, lo, hi));
+      }
       const unchangedFromBase = next.every((v, i) => v === S[i]);
       const first = firstEditableAge(s.profile, envelopeOf(s));
       const anchors = pruneAnchors(next, unchangedFromBase ? anchors0 : cleanAnchors([...anchors0, a.age], s.profile, envelopeOf(s)), x, first);

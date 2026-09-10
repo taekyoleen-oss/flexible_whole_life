@@ -12,9 +12,9 @@ export interface Recommendation {
 const REASON: Record<PresetId, (s: DesignState) => string> = {
   child: (s) => `막내(${Math.min(...s.profile.childrenAges)}세)가 독립하는 ${assumptionOf(s).needs.independenceAge}세까지 보장을 높게 두고 이후 30%로 줄입니다`,
   debt: (s) => `부채 ${Math.round(s.profile.debt / 1e4).toLocaleString()}만원을 만기 ${s.profile.debtYears}년에 맞춰 선형으로 줄입니다`,
-  group: (s) => `단체보험이 끝나는 ${s.profile.groupCoverEndAge}세 전 4년간 100%로 올립니다`,
-  estate: () => "50세 이상, 자녀 독립: 초기 50%에서 연 10% 체증해 상속 재원을 키웁니다",
-  retire: (s) => `은퇴(${s.profile.retirementAge}세) 직전 3년간 1.5배로 올립니다`,
+  group: (s) => `퇴직(${s.profile.retirementAge}세) 전 5년간 매년 10%씩 100%로 올립니다`,
+  estate: () => "50세 이상, 자녀 독립: 초기 50%에서 매년 10%씩 올려 상속 재원을 키웁니다",
+  retire: (s) => `은퇴(${s.profile.retirementAge}세) 전 5년간 매년 10%씩 1.5배로 올립니다`,
   level: () => "특별한 경계가 없어 전 기간 같은 보험금으로 시작합니다",
 };
 
