@@ -87,8 +87,8 @@ export const termOf = (p: Profile) => omegaOf(p.sex) - p.age;
 export const endAgeOf = (p: Profile) => omegaOf(p.sex) - 1;
 
 /** 입력 정보 중 설계에 반영한 항목. 기본은 모두 false — 프리셋은 표준 경계로 그린다 */
-export interface InfoApplied { child: boolean; debt: boolean; group: boolean; retire: boolean }
-export const NO_INFO: InfoApplied = { child: false, debt: false, group: false, retire: false };
+export interface InfoApplied { child: boolean; debt: boolean; group: boolean; retire: boolean; income: boolean }   // income: 기준보험금을 연소득 기반(니즈·HLV)으로 정했는지
+export const NO_INFO: InfoApplied = { child: false, debt: false, group: false, retire: false, income: false };
 /** 표준 경계(가입 후 경과년 기준): 자녀 독립 20년 후(막내 5세 가정), 부채 만기 20년(5년 후부터 15년 감액), 단체보험 60세, 은퇴 65세 */
 export const STANDARD_BOUNDARY = { youngestChildAge: 5, debtYears: 20, groupCoverEndAge: 60, retirementAge: 65 } as const;
 
@@ -283,7 +283,7 @@ export function reducer(s: DesignState, a: Action): DesignState {
       const S0 = roundS0(Number(merged.S0));
       const anchors = cleanAnchors(merged.anchors, profile, settings.envelope);
       const ia = (raw?.infoApplied ?? {}) as Partial<Record<keyof InfoApplied, unknown>>;
-      const infoApplied: InfoApplied = { child: ia.child === true, debt: ia.debt === true, group: ia.group === true, retire: ia.retire === true };
+      const infoApplied: InfoApplied = { child: ia.child === true, debt: ia.debt === true, group: ia.group === true, retire: ia.retire === true, income: ia.income === true };
       merged.infoApplied = infoApplied;
       return { ...withBlocks({ ...merged, payYears, S0, anchors }, deathSegments(blocks), celebrations(blocks)), updatedAt: merged.updatedAt };
     }
@@ -299,14 +299,14 @@ export function reducer(s: DesignState, a: Action): DesignState {
       const deaths = s.presetId === "custom" ? deathSegments(s.blocks) : buildPreset(s.presetId, presetContext(profile, envelopeOf(s), s.infoApplied));
       return withBlocks(next, deaths, celebrations(s.blocks));
     }
-    case "S0": return touch({ S0: a.exact ? clamp(Math.round(a.S0), 0, S0_MAX) : roundS0(a.S0) });   // exact: 재설계처럼 예산이 정한 값
+    case "S0": return touch({ S0: a.exact ? clamp(Math.round(a.S0), 0, S0_MAX) : roundS0(a.S0), infoApplied: { ...s.infoApplied, income: false } });   // exact: 재설계처럼 예산이 정한 값. 손으로 바꾸면 연소득 반영 표시는 해제
     case "payYears": return touch({ payYears: clamp(Math.round(a.payYears), 1, termOf(s.profile)) });
     case "waiver": return touch({ waiver: a.on });
     case "lowSurrender": return touch({ lowSurrender: a.on });
     case "preset": return withBlocks({ ...s, anchors: [] }, buildPreset(a.id, presetContext(s.profile, envelopeOf(s), s.infoApplied)), celebrations(s.blocks), a.id);
     case "applyInfo": {
       // 입력 정보 반영: 체크한 경계만 프로필 값으로, 선택하면 기준보험금·프리셋도 함께. 프리셋 상태면 다시 그린다
-      const infoApplied: InfoApplied = { ...s.infoApplied, ...a.applied };
+      const infoApplied: InfoApplied = { ...s.infoApplied, ...a.applied, income: a.S0 !== undefined ? true : (a.applied.income ?? s.infoApplied.income) };
       const presetId = a.presetId ?? s.presetId;
       const S0 = a.S0 !== undefined ? roundS0(a.S0) : s.S0;
       const next = { ...s, infoApplied, S0 };

@@ -101,6 +101,8 @@ describe("프리셋", () => {
     expect(presetContext(s.profile, undefined, s.infoApplied).youngestChildAge).toBe(3);
     s = reducer(s, { type: "applyInfo", applied: { child: false }, S0: 3e8, presetId: "level" });
     expect(s.S0).toBe(3e8); expect(s.presetId).toBe("level"); expect(s.infoApplied.child).toBe(false);
+    expect(s.infoApplied.income).toBe(true);                       // 기준보험금을 반영하면 연소득 반영 표시
+    expect(reducer(s, { type: "S0", S0: 2e8 }).infoApplied.income).toBe(false);   // 손으로 바꾸면 해제
   });
   it("부채 만기는 표준 20년, 입력 반영을 켜고 부채가 있을 때만 프로필 값", () => {
     expect(presetContext(initialState().profile).debtYears).toBe(20);

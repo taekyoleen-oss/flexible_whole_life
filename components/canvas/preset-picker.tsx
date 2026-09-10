@@ -4,14 +4,13 @@ import { HelpPopup } from "@/components/help-popup";
 import { Card } from "@/components/ui";
 import { PRESETS, type PresetId } from "@/lib/engine";
 import { boundaryLabel, PRESET_INFO } from "@/lib/preset-info";
-import { ApplyInfoButton } from "./apply-info";
 
 /** 프리셋 6종. 각 카드 아래에 "입력 정보 반영" 체크(기본 해제)와 조건의 근거 "?" */
 export function PresetPicker() {
   const { state, dispatch } = useDesign();
   return (
-    <Card title={<span className="flex flex-wrap items-center justify-between gap-2">프리셋 <span className="flex items-center gap-2 font-sans text-xs font-normal">{state.presetId === "custom" && <span className="rounded bg-navy/5 px-2 py-0.5 text-navy/70">직접 편집 중</span>}<ApplyInfoButton /></span></span>}>
-      <p className="mb-2 text-xs text-navy/60">기준보험금 1억, 표준 경계로 그립니다. 입력 화면의 정보를 쓰려면 카드의 체크박스를 켜세요.</p>
+    <Card title={<span className="flex flex-wrap items-center justify-between gap-2">프리셋 {state.presetId === "custom" && <span className="rounded bg-navy/5 px-2 py-0.5 font-sans text-xs font-normal text-navy/70">직접 편집 중</span>}</span>}>
+      <p className="mb-2 text-xs text-navy/60">기준보험금 1억, 표준 경계로 그립니다. 입력 화면의 정보를 쓰려면 카드의 체크박스를 켜거나 입력 요약의 &quot;입력 정보 반영&quot;을 누르세요.</p>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
         {(Object.keys(PRESETS) as PresetId[]).map((id) => {
           const active = state.presetId === id;

@@ -32,5 +32,6 @@ export function boundaryLabel(key: keyof InfoApplied, s: DesignState): { text: s
     case "debt": return { available: p.debt > 0, text: p.debt > 0 ? `부채 만기 ${p.debtYears}년 → ${p.age + p.debtYears}세 (표준 ${p.age + STANDARD_BOUNDARY.debtYears}세)` : "부채 정보 없음 (입력 화면에서 추가)" };
     case "group": return { available: p.groupCover > 0, text: p.groupCover > 0 ? `단체보험 만기 ${p.groupCoverEndAge}세 (표준 ${STANDARD_BOUNDARY.groupCoverEndAge}세)` : "단체보험 정보 없음 (입력 화면에서 추가)" };
     case "retire": return { available: true, text: `은퇴 ${p.retirementAge}세 (표준 ${STANDARD_BOUNDARY.retirementAge}세)` };
+    case "income": return { available: p.income > 0, text: `연소득 ${Math.round(p.income / 1e4).toLocaleString()}만원 → 니즈·HLV 기준보험금` };
   }
 }
