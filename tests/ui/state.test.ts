@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { expandBlocks } from "@/lib/engine";
+import { DEFAULT_ENVELOPE, expandBlocks, validate } from "@/lib/engine";
 import { celebrations, deathSegments, initialState, presetContext, reducer, s0FromMonthly, termOf, toEngineInput } from "@/lib/state";
 
 describe("초기 상태", () => {
@@ -59,5 +59,79 @@ describe("프리셋", () => {
     expect(celebrations(s.blocks)).toEqual([{ fromAge: 65, toAge: 65, multiple: 0.2, kind: "celebration" }]);
     const { C } = expandBlocks(s.blocks, 45, termOf(s.profile));
     expect(C[20]).toBe(0.2);
+  });
+});
+
+const seg = (s: ReturnType<typeof initialState>) => deathSegments(s.blocks).map((b) => [b.fromAge, b.toAge, b.multiple]);
+
+describe("구간 카드 편집", () => {
+  it("분할: 40~109 → 40~74 · 75~109, custom", () => {
+    const s = reducer(initialState(), { type: "splitSegment", index: 0 });
+    expect(seg(s)).toEqual([[40, 74, 1], [75, 109, 1]]);
+    expect(s.presetId).toBe("custom");
+  });
+  it("toAge를 줄이면 뒤 카드가 앞당겨지고, 늘려서 뒤 카드를 삼키면 카드가 준다", () => {
+    let s = reducer(initialState(), { type: "splitSegment", index: 0 });
+    s = reducer(s, { type: "segment", index: 0, patch: { toAge: 60 } });
+    expect(seg(s)).toEqual([[40, 60, 1], [61, 109, 1]]);
+    s = reducer(s, { type: "segment", index: 0, patch: { toAge: 120 } });
+    expect(seg(s)).toEqual([[40, 109, 1]]);
+  });
+  it("마지막 카드 toAge는 항상 최종연령", () => {
+    let s = reducer(initialState(), { type: "splitSegment", index: 0 });
+    s = reducer(s, { type: "segment", index: 1, patch: { toAge: 90 } });
+    expect(seg(s)).toEqual([[40, 74, 1], [75, 109, 1]]);
+  });
+  it("배수 편집은 0~10 clamp, 삭제는 앞 카드로 합친다", () => {
+    let s = reducer(initialState(), { type: "splitSegment", index: 0 });
+    s = reducer(s, { type: "segment", index: 1, patch: { multiple: 12 } });
+    expect(seg(s)).toEqual([[40, 74, 1], [75, 109, 10]]);
+    s = reducer(s, { type: "removeSegment", index: 1 });
+    expect(seg(s)).toEqual([[40, 109, 1]]);
+    expect(reducer(s, { type: "removeSegment", index: 0 })).toBe(s); // 카드 하나면 삭제 불가
+  });
+  it("첫 카드 삭제는 다음 카드가 가입연령부터 시작", () => {
+    let s = reducer(initialState(), { type: "splitSegment", index: 0 });
+    s = reducer(s, { type: "segment", index: 1, patch: { multiple: 0.5 } });
+    s = reducer(s, { type: "removeSegment", index: 0 });
+    expect(seg(s)).toEqual([[40, 109, 0.5]]);
+  });
+});
+
+describe("축하금", () => {
+  it("추가·수정·삭제, 범위 밖이면 버린다", () => {
+    let s = reducer(initialState(), { type: "addCelebration", age: 65, multiple: 0.2 });
+    s = reducer(s, { type: "celebration", index: 0, patch: { multiple: 0.5, fromAge: 70 } });
+    expect(celebrations(s.blocks)).toEqual([{ fromAge: 70, toAge: 70, multiple: 0.5, kind: "celebration" }]);
+    s = reducer(s, { type: "celebration", index: 0, patch: { fromAge: 30 } });
+    expect(celebrations(s.blocks)).toEqual([]);
+    s = reducer(s, { type: "addCelebration", age: 60, multiple: 0.1 });
+    s = reducer(s, { type: "removeCelebration", index: 0 });
+    expect(celebrations(s.blocks)).toEqual([]);
+  });
+});
+
+describe("자동 수정", () => {
+  const ctx = (s: ReturnType<typeof initialState>) => ({ S0: s.S0, age: s.profile.age, n: termOf(s.profile), payYears: s.payYears, freq: 12, grossUnit: 0.0015 });
+  const codes = (s: ReturnType<typeof initialState>) => { const { S, C } = expandBlocks(s.blocks, s.profile.age, termOf(s.profile)); return validate(S, C, ctx(s), DEFAULT_ENVELOPE).map((v) => v.code); };
+  it("E01: 초기 5년 안의 경계를 5년째로 민다", () => {
+    let s = reducer(initialState(), { type: "splitSegment", index: 0 });
+    s = reducer(s, { type: "segment", index: 0, patch: { toAge: 41 } });
+    s = reducer(s, { type: "segment", index: 1, patch: { multiple: 0.5 } });
+    expect(codes(s)).toContain("E01");
+    s = reducer(s, { type: "autoFix", code: "E01" });
+    expect(seg(s)).toEqual([[40, 44, 1], [45, 109, 0.5]]);
+    expect(codes(s)).not.toContain("E01");
+  });
+  it("E04·E05: 배수를 0.2~3으로 clamp", () => {
+    let s = reducer(initialState(), { type: "splitSegment", index: 0 });
+    s = reducer(s, { type: "segment", index: 1, patch: { multiple: 5 } });
+    expect(codes(s)).toContain("E04");
+    s = reducer(s, { type: "autoFix", code: "E04" });
+    expect(seg(s)[1][2]).toBe(3);
+    s = reducer(s, { type: "segment", index: 1, patch: { multiple: 0.05 } });
+    expect(codes(s)).toContain("E05");
+    s = reducer(s, { type: "autoFix", code: "E05" });
+    expect(seg(s)[1][2]).toBe(0.2);
   });
 });
