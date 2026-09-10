@@ -13,6 +13,16 @@ node scripts/extract-rates.mjs  # 위험률표 재추출 (../Python_Web_like_Exc
 npm run dev                     # Next.js 개발 서버
 ```
 
+## 화면 (단계 2)
+
+| 라우트 | 내용 |
+|---|---|
+| `/` | 이어서 설계 · 새 설계 · 샘플 3종(자녀연령형·부채상환형·상속준비형) |
+| `/start` | 고객 정보 한 페이지 입력(피보험자·가족·재무·기존 보장·예산) |
+| `/design` | 3열 캔버스: 입력 요약·예산 슬라이더 / 프리셋·스케줄 그래프·구간 카드 / 보험료·검증·환급금 곡선·산출 근거 |
+
+설계 상태는 localStorage(`fwl:design:v1`)에 자동 저장된다. 단계 3(추천·비교·인쇄·공유·설정)은 별도 계획.
+
 ## 엔진 `lib/engine`
 
 UI 무관 순수 함수. 진입점은 `compute`, `compareAtBudget`, `validate`, `buildPreset`, `needs` (`lib/engine/index.ts`).
