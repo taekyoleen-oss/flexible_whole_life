@@ -1,5 +1,5 @@
 import kli7 from "@/lib/engine/data/rates-kli7.json";
-import { buildPreset, DEFAULT_ENVELOPE, type Block, type EngineInput, type PresetContext, type PresetId, type RateTable, type Sex } from "@/lib/engine";
+import { buildPreset, compute, DEFAULT_ENVELOPE, getAssumption, type Block, type EngineInput, type EngineResult, type PresetContext, type PresetId, type RateTable, type Sex } from "@/lib/engine";
 import { clamp } from "./format";
 
 export const TABLE = kli7 as RateTable;
@@ -58,6 +58,9 @@ export const DEFAULT_STATE: DesignState = initialState();
 export function toEngineInput(s: DesignState): EngineInput {
   return { sex: s.profile.sex, age: s.profile.age, payYears: s.payYears, S0: s.S0, blocks: s.blocks, waiver: s.waiver, lowSurrender: s.lowSurrender };
 }
+
+/** 현재 가정 세트·위험률표로 설계 상태를 산출한다 */
+export const evaluate = (s: DesignState): EngineResult => compute(toEngineInput(s), getAssumption(ASSUMPTION_ID), TABLE);
 
 /** 월 보험료(원) → 기준보험금(원, 1만원 단위). gross100k = 10만원당 월 영업보험료(정수) */
 export const s0FromMonthly = (monthly: number, gross100k: number) => clamp(Math.round((monthly * 1e5) / gross100k / 1e4) * 1e4, 1e6, 1e10);

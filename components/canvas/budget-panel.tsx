@@ -8,17 +8,20 @@ const PAY_YEARS = [5, 10, 15, 20, 30];
 
 export function BudgetFields() {
   const { state, dispatch, result } = useDesign();
-  const monthly = result.monthly.gross;
-  const setMonthly = (m: number) => dispatch({ type: "S0", S0: s0FromMonthly(m, result.per100k.gross) });
+  // 저해지 시 실제 납입액은 할인된 보험료다. 표시·역산 모두 이 값 기준으로 맞춘다.
+  const gross100k = result.lowSurrender?.gross100k ?? result.per100k.gross;
+  const monthly = gross100k * result.units;
+  const totalPaid = monthly * 12 * state.payYears;
+  const setMonthly = (m: number) => dispatch({ type: "S0", S0: s0FromMonthly(m, gross100k) });
   return (
     <div className="space-y-3">
-      <Field label="월 보험료" hint={<>초기 보험금 {won(result.S[0] * state.S0)} · 총 납입 {won(result.totalPaid)}</>}>
+      <Field label="월 보험료" hint={<>초기 보험금 {won(result.S[0] * state.S0)} · 총 납입 {won(totalPaid)}{state.lowSurrender && " (저해지)"}</>}>
         <ManwonInput value={monthly} onChange={setMonthly} min={1} max={1000} />
       </Field>
       <input type="range" className="w-full accent-sky" min={5} max={300} step={1} aria-label="월 보험료 슬라이더"
         value={clamp(Math.round(monthly / 1e4), 5, 300)} onChange={(e) => setMonthly(Number(e.target.value) * 1e4)} />
       <Field label="기준보험금" hint="초기 고정 구간 배수 1.0에 해당하는 보험금">
-        <ManwonInput value={state.S0} onChange={(v) => dispatch({ type: "S0", S0: v })} min={100} max={1e6} step={100} />
+        <ManwonInput value={state.S0} onChange={(v) => dispatch({ type: "S0", S0: v })} min={100} max={1e6} />
       </Field>
     </div>
   );

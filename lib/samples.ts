@@ -1,5 +1,5 @@
-import { buildPreset, compute, getAssumption, type PresetId } from "@/lib/engine";
-import { ASSUMPTION_ID, initialState, presetContext, s0FromMonthly, TABLE, toEngineInput, type DesignState, type Profile } from "./state";
+import { buildPreset, type PresetId } from "@/lib/engine";
+import { evaluate, initialState, presetContext, s0FromMonthly, type DesignState, type Profile } from "./state";
 
 export interface Sample { id: string; label: string; description: string; monthly: number; profile: Partial<Profile>; presetId: PresetId }
 
@@ -17,6 +17,7 @@ export function buildSample(s: Sample): DesignState {
   const base = initialState();
   const profile: Profile = { ...base.profile, ...s.profile };
   const draft: DesignState = { ...base, profile, presetId: s.presetId, blocks: buildPreset(s.presetId, presetContext(profile)) };
-  const unit = compute({ ...toEngineInput(draft), S0: 1e5 }, getAssumption(ASSUMPTION_ID), TABLE);
+  // per100k는 S0에 의존하지 않으므로 draft의 S0 그대로 평가해 역산에 쓴다.
+  const unit = evaluate(draft);
   return { ...draft, S0: s0FromMonthly(s.monthly, unit.per100k.gross), updatedAt: Date.now() };
 }

@@ -35,12 +35,13 @@ export function Button({ primary, className = "", ...props }: ButtonHTMLAttribut
 }
 
 /** 숫자 입력. 타이핑 중에는 로컬 문자열을 쓰고, blur/Enter에 숫자로 확정한다(clamp로 값이 튀지 않게). */
-export function NumInput({ value, onCommit, ...rest }: Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | "type"> & { value: number; onCommit: (n: number) => void }) {
+export function NumInput({ value, onCommit, ...rest }: Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | "type" | "onBlur" | "onKeyDown"> & { value: number; onCommit: (n: number) => void }) {
   const [text, setText] = useState(String(value));
   useEffect(() => setText(String(value)), [value]);
   const commit = () => {
     const n = Number(text);
-    if (text.trim() !== "" && Number.isFinite(n)) onCommit(n); else setText(String(value));
+    if (text.trim() !== "" && Number.isFinite(n)) onCommit(n);
+    setText(String(value)); // 부모가 clamp해 되돌려도 표시를 맞춘다; value가 바뀌면 effect가 다시 덮는다
   };
   return <Input {...rest} type="number" value={text} onChange={(e) => setText(e.target.value)} onBlur={commit} onKeyDown={(e) => { if (e.key === "Enter") commit(); }} />;
 }

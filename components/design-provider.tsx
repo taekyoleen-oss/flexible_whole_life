@@ -1,7 +1,7 @@
 "use client";
 import { createContext, useContext, useEffect, useMemo, useReducer, useState, type Dispatch, type ReactNode } from "react";
-import { compute, DEFAULT_ENVELOPE, getAssumption, validate, type EngineResult, type Violation } from "@/lib/engine";
-import { ASSUMPTION_ID, DEFAULT_STATE, reducer, STORAGE_KEY, TABLE, toEngineInput, type Action, type DesignState } from "@/lib/state";
+import { DEFAULT_ENVELOPE, validate, type EngineResult, type Violation } from "@/lib/engine";
+import { DEFAULT_STATE, evaluate, reducer, STORAGE_KEY, type Action, type DesignState } from "@/lib/state";
 
 export interface DesignCtx {
   state: DesignState;
@@ -40,7 +40,7 @@ export function DesignProvider({ children }: { children: ReactNode }) {
   }, [state, loaded]);
 
   const value = useMemo<DesignCtx>(() => {
-    const result = compute(toEngineInput(state), getAssumption(ASSUMPTION_ID), TABLE);
+    const result = evaluate(state);
     const violations = validate(result.S, result.C,
       { S0: state.S0, age: state.profile.age, n: result.n, payYears: state.payYears, freq: 12, grossUnit: result.perUnit.gross },
       DEFAULT_ENVELOPE);
