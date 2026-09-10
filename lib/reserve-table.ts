@@ -12,6 +12,7 @@ export interface ReserveRow {
   reserveStd: number;   // 표준 준비금(연말)
   cash: number;         // 해약환급금(저해지면 인하 반영)
   rate: number;         // 환급률
+  expense: number;      // 해당 연도 사업비(원). 0년차에 신계약비 포함
 }
 
 export function reserveRows(s: DesignState, r: EngineResult): ReserveRow[] {
@@ -26,14 +27,15 @@ export function reserveRows(s: DesignState, r: EngineResult): ReserveRow[] {
     reserveStd: r.reserveStd100k[t] * r.units,
     cash: eff.cash[t],
     rate: eff.rate[t],
+    expense: r.expenseFlow[t] ?? 0,
   }));
 }
 
-export const RESERVE_HEADERS = ["경과년", "연령", "사망보험금", "축하금", "납입누계", "적용준비금", "표준준비금", "해약환급금", "환급률(%)"] as const;
+export const RESERVE_HEADERS = ["경과년", "연령", "사망보험금", "축하금", "납입누계", "적용준비금", "표준준비금", "해약환급금", "환급률(%)", "사업비(연)"] as const;
 
 /** Excel에서 바로 열리도록 BOM 포함 CSV. 금액은 원 단위 정수, 환급률은 소수 1자리 % */
 export function reserveCsv(rows: ReserveRow[]): string {
   const lines = [RESERVE_HEADERS.join(",")];
-  for (const r of rows) lines.push([r.t, r.age, Math.round(r.benefit), Math.round(r.celebration), Math.round(r.paid), Math.round(r.reserve), Math.round(r.reserveStd), Math.round(r.cash), (r.rate * 100).toFixed(1)].join(","));
+  for (const r of rows) lines.push([r.t, r.age, Math.round(r.benefit), Math.round(r.celebration), Math.round(r.paid), Math.round(r.reserve), Math.round(r.reserveStd), Math.round(r.cash), (r.rate * 100).toFixed(1), Math.round(r.expense)].join(","));
   return "﻿" + lines.join("\r\n");
 }

@@ -83,8 +83,8 @@ export function buildWorkbook(s: DesignState, r: EngineResult): XLSX.WorkBook {
 
   // 5. 준비금·환급금
   const rows = reserveRows(s, r);
-  const resRows: Row[] = [["경과년", "연령", "사망보험금", "축하금", "납입누계", "적용준비금", "표준준비금", "해약환급금", "환급률", "적용준비금(10만원당)", "표준준비금(10만원당)"]];
-  for (const x of rows) resRows.push([x.t, x.age, x.benefit, x.celebration, x.paid, x.reserve, x.reserveStd, x.cash, x.rate, r.reserve100k[x.t], r.reserveStd100k[x.t]]);
+  const resRows: Row[] = [["경과년", "연령", "사망보험금", "축하금", "납입누계", "적용준비금", "표준준비금", "해약환급금", "환급률", "사업비(연)", "적용준비금(10만원당)", "표준준비금(10만원당)"]];
+  for (const x of rows) resRows.push([x.t, x.age, x.benefit, x.celebration, x.paid, x.reserve, x.reserveStd, x.cash, x.rate, x.expense, r.reserve100k[x.t], r.reserveStd100k[x.t]]);
   const wsRes = XLSX.utils.aoa_to_sheet(resRows); wsRes["!cols"] = resRows[0].map(() => ({ wch: 16 }));
   XLSX.utils.book_append_sheet(wb, wsRes, SHEETS[4]);
 

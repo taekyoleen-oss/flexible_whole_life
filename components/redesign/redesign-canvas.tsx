@@ -24,7 +24,7 @@ export function RedesignCanvas({ old, budget, mode, lastRedesignedAt }: { old: O
   const rules = checkRules(old, state, r, lastRedesignedAt);
   const loss = conversionLoss(old, state.settings);
   const rows = compareOptions(old, r, state.settings);
-  const table: ReserveRow[] = r.reserve100k.map((v, t) => ({ t, age: old.attainedAge + t, benefit: (r.S[Math.min(t, r.n - 1)] ?? 0) * r.S0, celebration: (r.C[t] ?? 0) * r.S0, paid: r.paid[t], reserve: v * r.units, reserveStd: v * r.units, cash: r.cash[t], rate: r.rate[t] }));
+  const table: ReserveRow[] = r.reserve100k.map((v, t) => ({ t, age: old.attainedAge + t, benefit: (r.S[Math.min(t, r.n - 1)] ?? 0) * r.S0, celebration: (r.C[t] ?? 0) * r.S0, paid: r.paid[t], reserve: v * r.units, reserveStd: v * r.units, cash: r.cash[t], rate: r.rate[t], expense: 0 }));
   const HELP: Partial<Record<string, FormulaId>> = { "재설계 시점 준비금": "redesignReserve", "전환 손실 (기초율 차이)": "loss" };
   const summary: [string, string][] = [
     [`월 보험료 (남은 ${budget.payYears}년)`, won(r.monthly.gross)],
@@ -79,7 +79,7 @@ export function RedesignCanvas({ old, budget, mode, lastRedesignedAt }: { old: O
         <summary className="cursor-pointer font-display text-lg text-navy">준비금·환급금 표 (재설계)</summary>
         <div className="mt-2 flex items-center justify-between text-xs text-navy/60"><span>재설계 계약은 표준기초 준비금을 따로 내지 않아 표준 준비금 = 적용 준비금입니다.</span><Button onClick={() => downloadJson(`재설계_준비금표_${old.attainedAge}세.csv`, reserveCsv(table), "text/csv")}>CSV 다운로드</Button></div>
         <div className="mt-2 max-h-80 overflow-auto"><table className="w-full text-xs"><thead className="sticky top-0 bg-white text-navy/60"><tr>{RESERVE_HEADERS.map((h) => <th key={h} className="text-right first:text-left">{h}</th>)}</tr></thead>
-          <tbody>{table.map((row) => <tr key={row.t} className="border-t border-navy/10 font-mono"><td>{row.t}</td><td className="text-right">{row.age}</td><td className="text-right">{won(row.benefit)}</td><td className="text-right">{row.celebration ? won(row.celebration) : "-"}</td><td className="text-right">{won(row.paid)}</td><td className="text-right">{won(row.reserve)}</td><td className="text-right">{won(row.reserveStd)}</td><td className="text-right">{won(row.cash)}</td><td className="text-right">{pct(row.rate)}</td></tr>)}</tbody></table></div>
+          <tbody>{table.map((row) => <tr key={row.t} className="border-t border-navy/10 font-mono"><td>{row.t}</td><td className="text-right">{row.age}</td><td className="text-right">{won(row.benefit)}</td><td className="text-right">{row.celebration ? won(row.celebration) : "-"}</td><td className="text-right">{won(row.paid)}</td><td className="text-right">{won(row.reserve)}</td><td className="text-right">{won(row.reserveStd)}</td><td className="text-right">{won(row.cash)}</td><td className="text-right">{pct(row.rate)}</td><td className="text-right">-</td></tr>)}</tbody></table></div>
       </details>
 
       <div className="flex flex-wrap items-center gap-2">

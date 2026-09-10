@@ -14,6 +14,9 @@ describe("준비금·환급금 연도별 표", () => {
     expect(rows[20].reserve).toBe(r.reserve100k[20] * r.units);
     expect(rows[20].cash).toBe(r.surrender.cash[20]);
     expect(rows[20].rate).toBeCloseTo(r.surrender.rate[20], 12);
+    expect(rows[0].expense).toBe(r.expenseFlow[0]);            // 0년차 = 신계약비 + 유지·수금비
+    expect(rows[0].expense).toBeGreaterThan(rows[1].expense);
+    expect(rows[r.n].expense).toBe(0);                          // 보장 종료 후
   });
   it("저해지면 환급금·납입누계가 인하 기준", () => {
     const low = reducer(s, { type: "lowSurrender", on: true });
@@ -30,5 +33,6 @@ describe("준비금·환급금 연도별 표", () => {
     expect(lines).toHaveLength(4);
     expect(lines[1].split(",").slice(0, 3)).toEqual(["0", "40", "100000000"]);
     expect(lines[3].split(",")[8]).toMatch(/^\d+\.\d$/);
+    expect(lines[1].split(",")).toHaveLength(RESERVE_HEADERS.length);
   });
 });
