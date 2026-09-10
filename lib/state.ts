@@ -70,6 +70,7 @@ export interface DesignState {
   blocks: Block[];       // death 카드(연속·빈틈 없음) + celebration 카드
   anchors: number[];     // 그래프에서 직접 정한 변경 연령(오름차순). 이 사이는 매년 한 칸씩 보간된다
   settings: Settings;    // 가정 세트·설계 제약
+  infoApplied: InfoApplied; // 입력 정보 중 프리셋 경계에 반영한 항목
   updatedAt: number;     // 0이면 한 번도 편집하지 않은 기본 상태
 }
 
@@ -85,12 +86,21 @@ export const termOf = (p: Profile) => omegaOf(p.sex) - p.age;
 /** 마지막 사망보장 연령 = ω − 1 */
 export const endAgeOf = (p: Profile) => omegaOf(p.sex) - 1;
 
-export function presetContext(p: Profile, env: EnvelopeParams = DEFAULT_ENVELOPE): PresetContext {
+/** 입력 정보 중 설계에 반영한 항목. 기본은 모두 false — 프리셋은 표준 경계로 그린다 */
+export interface InfoApplied { child: boolean; debt: boolean; group: boolean; retire: boolean }
+export const NO_INFO: InfoApplied = { child: false, debt: false, group: false, retire: false };
+/** 표준 경계(가입 후 경과년 기준): 자녀 독립 20년 후(막내 5세 가정), 부채 만기 20년(5년 후부터 15년 감액), 단체보험 60세, 은퇴 65세 */
+export const STANDARD_BOUNDARY = { youngestChildAge: 5, debtYears: 20, groupCoverEndAge: 60, retirementAge: 65 } as const;
+
+/** 프리셋 경계. 반영 플래그가 켜진 항목만 프로필 값을 쓰고 나머지는 표준 경계 */
+export function presetContext(p: Profile, env: EnvelopeParams = DEFAULT_ENVELOPE, applied: InfoApplied = NO_INFO): PresetContext {
+  const hasChild = p.childrenAges.length > 0;
   return {
     age: p.age, n: termOf(p),
-    youngestChildAge: p.childrenAges.length ? Math.min(...p.childrenAges) : undefined,
-    debtYears: p.debt > 0 ? p.debtYears : undefined,
-    retirementAge: p.retirementAge, groupCoverEndAge: p.groupCoverEndAge,
+    youngestChildAge: applied.child && hasChild ? Math.min(...p.childrenAges) : STANDARD_BOUNDARY.youngestChildAge,
+    debtYears: applied.debt && p.debt > 0 ? p.debtYears : STANDARD_BOUNDARY.debtYears,
+    retirementAge: applied.retire ? p.retirementAge : STANDARD_BOUNDARY.retirementAge,
+    groupCoverEndAge: applied.group ? p.groupCoverEndAge : STANDARD_BOUNDARY.groupCoverEndAge,
     growthEndAge: env.growthEndAge,
   };
 }
@@ -98,7 +108,7 @@ export function presetContext(p: Profile, env: EnvelopeParams = DEFAULT_ENVELOPE
 export function initialState(): DesignState {
   return {
     version: 1, profile: DEFAULT_PROFILE, S0: 1e8, payYears: 20, waiver: true, lowSurrender: false,
-    presetId: "level", blocks: buildPreset("level", presetContext(DEFAULT_PROFILE)), anchors: [], settings: DEFAULT_SETTINGS, updatedAt: 0,
+    presetId: "level", blocks: buildPreset("level", presetContext(DEFAULT_PROFILE)), anchors: [], settings: DEFAULT_SETTINGS, infoApplied: NO_INFO, updatedAt: 0,
   };
 }
 export const DEFAULT_STATE: DesignState = initialState();
@@ -256,6 +266,7 @@ export type Action =
   | { type: "removeCelebration"; index: number }
   | { type: "level"; age: number; multiple: number; base?: LevelBase }
   | { type: "settings"; patch: Partial<Settings> }
+  | { type: "applyInfo"; applied: Partial<InfoApplied>; S0?: number; presetId?: PresetId }
   | { type: "autoFix"; code: AutoFixCode };
 
 export function reducer(s: DesignState, a: Action): DesignState {
@@ -270,20 +281,32 @@ export function reducer(s: DesignState, a: Action): DesignState {
       const payYears = clamp(Math.round(Number(merged.payYears)), 1, termOf(profile));
       const S0 = roundS0(Number(merged.S0));
       const anchors = cleanAnchors(merged.anchors, profile, settings.envelope);
+      const ia = (raw?.infoApplied ?? {}) as Partial<Record<keyof InfoApplied, unknown>>;
+      const infoApplied: InfoApplied = { child: ia.child === true, debt: ia.debt === true, group: ia.group === true, retire: ia.retire === true };
+      merged.infoApplied = infoApplied;
       return { ...withBlocks({ ...merged, payYears, S0, anchors }, deathSegments(blocks), celebrations(blocks)), updatedAt: merged.updatedAt };
     }
     case "reset": return { ...initialState(), settings: s.settings };
     case "profile": {
       const profile = clampProfile({ ...s.profile, ...a.patch });
       const next = { ...s, profile, anchors: cleanAnchors(s.anchors, profile, envelopeOf(s)) };
-      const deaths = s.presetId === "custom" ? deathSegments(s.blocks) : buildPreset(s.presetId, presetContext(profile, envelopeOf(s)));
+      const deaths = s.presetId === "custom" ? deathSegments(s.blocks) : buildPreset(s.presetId, presetContext(profile, envelopeOf(s), s.infoApplied));
       return withBlocks(next, deaths, celebrations(s.blocks));
     }
     case "S0": return touch({ S0: a.exact ? clamp(Math.round(a.S0), 0, S0_MAX) : roundS0(a.S0) });   // exact: 재설계처럼 예산이 정한 값
     case "payYears": return touch({ payYears: clamp(Math.round(a.payYears), 1, termOf(s.profile)) });
     case "waiver": return touch({ waiver: a.on });
     case "lowSurrender": return touch({ lowSurrender: a.on });
-    case "preset": return withBlocks({ ...s, anchors: [] }, buildPreset(a.id, presetContext(s.profile, envelopeOf(s))), celebrations(s.blocks), a.id);
+    case "preset": return withBlocks({ ...s, anchors: [] }, buildPreset(a.id, presetContext(s.profile, envelopeOf(s), s.infoApplied)), celebrations(s.blocks), a.id);
+    case "applyInfo": {
+      // 입력 정보 반영: 체크한 경계만 프로필 값으로, 선택하면 기준보험금·프리셋도 함께. 프리셋 상태면 다시 그린다
+      const infoApplied: InfoApplied = { ...s.infoApplied, ...a.applied };
+      const presetId = a.presetId ?? s.presetId;
+      const S0 = a.S0 !== undefined ? roundS0(a.S0) : s.S0;
+      const next = { ...s, infoApplied, S0 };
+      if (presetId === "custom") return touch({ infoApplied, S0 });
+      return withBlocks({ ...next, anchors: [] }, buildPreset(presetId, presetContext(s.profile, envelopeOf(s), infoApplied)), celebrations(s.blocks), presetId);
+    }
     case "settings": {
       const merged = sanitizeSettings({ ...s.settings, ...a.patch });
       const baseId = s.settings.assumption.id === "custom" ? (s.settings.assumption.label.match(/기본: ([\w-]+)/)?.[1] ?? ASSUMPTION_ID) : s.settings.assumption.id;

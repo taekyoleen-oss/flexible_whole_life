@@ -1,5 +1,6 @@
 "use client";
 import { useState, type ReactNode } from "react";
+import { ApplyInfoButton } from "@/components/canvas/apply-info";
 import { BlockCards } from "@/components/canvas/block-cards";
 import { BudgetPanel } from "@/components/canvas/budget-panel";
 import { DesignToolbar } from "@/components/canvas/design-toolbar";
@@ -38,6 +39,7 @@ export default function DesignPage() {
       <p className="mb-2 flex flex-wrap items-center gap-x-2 text-sm text-navy">
         <span className="font-medium">피보험자</span><span>{subject}</span>
         <Link href="/start" className="text-xs text-sky hover:underline">수정</Link>
+        <ApplyInfoButton />
       </p>
       <DesignToolbar />
       <div className="mb-4 flex gap-2 lg:hidden">

@@ -89,20 +89,31 @@ describe("불러오기", () => {
 });
 
 describe("프리셋", () => {
-  it("자녀연령형: 막내 3세 → 62세(=25세 되는 해)부터 0.3", () => {
+  it("자녀연령형: 기본은 표준 경계(20년 후 0.3), 입력 반영을 켜면 막내 3세 → 62세부터 0.3", () => {
     let s = reducer(initialState(), { type: "profile", patch: { childrenAges: [3, 6] } });
     s = reducer(s, { type: "preset", id: "child" });
     expect(s.presetId).toBe("child");
     expect(deathSegments(s.blocks)).toEqual([
+      { fromAge: 40, toAge: 59, multiple: 1, kind: "death" },
+      { fromAge: 60, toAge: 109, multiple: 0.3, kind: "death" },
+    ]);
+    expect(presetContext(s.profile).youngestChildAge).toBe(5);
+    s = reducer(s, { type: "applyInfo", applied: { child: true } });
+    expect(s.infoApplied.child).toBe(true);
+    expect(deathSegments(s.blocks)).toEqual([
       { fromAge: 40, toAge: 61, multiple: 1, kind: "death" },
       { fromAge: 62, toAge: 109, multiple: 0.3, kind: "death" },
     ]);
-    expect(presetContext(s.profile).youngestChildAge).toBe(3);
+    expect(presetContext(s.profile, undefined, s.infoApplied).youngestChildAge).toBe(3);
+    s = reducer(s, { type: "applyInfo", applied: { child: false }, S0: 3e8, presetId: "level" });
+    expect(s.S0).toBe(3e8); expect(s.presetId).toBe("level"); expect(s.infoApplied.child).toBe(false);
   });
-  it("부채 0이면 debtYears는 컨텍스트에서 빠진다", () => {
-    expect(presetContext(initialState().profile).debtYears).toBeUndefined();
+  it("부채 만기는 표준 20년, 입력 반영을 켜고 부채가 있을 때만 프로필 값", () => {
+    expect(presetContext(initialState().profile).debtYears).toBe(20);
     const s = reducer(initialState(), { type: "profile", patch: { debt: 1e8, debtYears: 15 } });
-    expect(presetContext(s.profile).debtYears).toBe(15);
+    expect(presetContext(s.profile).debtYears).toBe(20);
+    expect(presetContext(s.profile, undefined, { ...s.infoApplied, debt: true }).debtYears).toBe(15);
+    expect(presetContext(reducer(s, { type: "profile", patch: { debt: 0 } }).profile, undefined, { ...s.infoApplied, debt: true }).debtYears).toBe(20);
   });
   it("프리셋 상태에서 프로필을 바꾸면 축하금은 유지된다", () => {
     let s = reducer(initialState(), { type: "addCelebration", age: 65 });
@@ -112,9 +123,10 @@ describe("프리셋", () => {
     const { C } = expandBlocks(s.blocks, 45, termOf(s.profile));
     expect(C[20]).toBe(0.1);
   });
-  it("축하금을 편집해도 프리셋(자녀연령형)이 프로필 변경에 계속 반응한다", () => {
+  it("축하금을 편집해도 프리셋(자녀연령형, 입력 반영)이 프로필 변경에 계속 반응한다", () => {
     let s = reducer(initialState(), { type: "profile", patch: { childrenAges: [] } });
-    s = reducer(s, { type: "preset", id: "child" });
+    s = reducer(s, { type: "applyInfo", applied: { child: true }, presetId: "child" });
+    expect(deathSegments(s.blocks)[0].toAge).toBe(59);   // 자녀 정보가 없으면 표준 경계(20년 후)
     s = reducer(s, { type: "addCelebration", age: 60 });
     s = reducer(s, { type: "profile", patch: { childrenAges: [1] } });
     expect(s.presetId).toBe("child");
