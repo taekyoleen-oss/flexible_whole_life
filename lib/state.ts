@@ -1,10 +1,56 @@
 import kli7 from "@/lib/engine/data/rates-kli7.json";
-import { buildPreset, compute, DEFAULT_ENVELOPE, expandBlocks, getAssumption, toBlocks, type Block, type EngineInput, type EngineResult, type PresetContext, type PresetId, type RateTable, type Sex } from "@/lib/engine";
+import { ASSUMPTIONS, buildPreset, compute, DEFAULT_ENVELOPE, expandBlocks, getAssumption, toBlocks, type AssumptionSet, type Block, type EngineInput, type EngineResult, type EnvelopeParams, type PresetContext, type PresetId, type RateTable, type Sex } from "@/lib/engine";
 import { clamp } from "./format";
 
 export const TABLE = kli7 as RateTable;
 export const ASSUMPTION_ID = "default-2026";
 export const STORAGE_KEY = "fwl:design:v1";
+
+/** 산출 가정과 설계 제약. 설계 상태의 일부라서 공유 링크·인쇄에도 그대로 실린다 */
+export interface Settings { assumption: AssumptionSet; envelope: EnvelopeParams }
+export const DEFAULT_SETTINGS: Settings = { assumption: getAssumption(ASSUMPTION_ID), envelope: DEFAULT_ENVELOPE };
+export const envelopeOf = (s: { settings?: Settings }): EnvelopeParams => s.settings?.envelope ?? DEFAULT_ENVELOPE;
+export const assumptionOf = (s: { settings?: Settings }): AssumptionSet => s.settings?.assumption ?? DEFAULT_SETTINGS.assumption;
+
+const num = (v: unknown, d: number) => (typeof v === "number" && Number.isFinite(v) ? v : d);
+const numObj = <T extends object>(raw: unknown, d: T): T => {
+  const o = (raw ?? {}) as Record<string, unknown>;
+  return Object.fromEntries(Object.entries(d as Record<string, number>).map(([k, v]) => [k, num(o[k], v)])) as T;
+};
+
+/** 저장·공유에서 온 설정을 믿지 않는다. 숫자가 아니면 기본값, 알 수 없는 세트는 기본 세트 */
+export function sanitizeSettings(raw: unknown): Settings {
+  const r = (raw ?? {}) as Partial<Record<keyof Settings, unknown>>;
+  const a = (r.assumption ?? {}) as Partial<AssumptionSet> & Record<string, unknown>;
+  const base = ASSUMPTIONS.find((x) => x.id === a.id) ?? (a.id === "custom" ? DEFAULT_SETTINGS.assumption : undefined);
+  let assumption = DEFAULT_SETTINGS.assumption;
+  if (base) {
+    const e = a.expenses as Record<string, unknown> | undefined;
+    const expenses: AssumptionSet["expenses"] = e?.model === "simple"
+      ? { model: "simple", ...numObj(e, { alpha: 0.007, beta: 0.0015, gamma: 0.02 }) }
+      : e?.model === "method"
+        ? { model: "method", ...numObj(e, { alphaS: 0.01, alphaP: 1, betaS: 0.0015, betaG: 0.045, betaPrime: 0.001, gamma: 0.025 }) }
+        : base.expenses;
+    assumption = {
+      ...base,
+      id: a.id === "custom" ? "custom" : base.id,
+      label: typeof a.label === "string" ? a.label : base.label,
+      version: typeof a.version === "string" ? a.version : base.version,
+      interest: num(a.interest, base.interest), standardInterest: num(a.standardInterest, base.standardInterest),
+      waiver: typeof a.waiver === "boolean" ? a.waiver : base.waiver,
+      expenses,
+      lowSurrender: numObj(a.lowSurrender, base.lowSurrender),
+      needs: numObj(a.needs, base.needs),
+    };
+  }
+  return { assumption, envelope: numObj(r.envelope, DEFAULT_ENVELOPE) };
+}
+
+/** 숫자를 하나라도 고치면 사용자 정의 세트가 된다 */
+export function customize(a: AssumptionSet, baseId: string): AssumptionSet {
+  const origin = a.id === "custom" ? baseId : a.id;
+  return { ...a, id: "custom", version: "사용자 정의", label: `사용자 정의 (기본: ${origin})` };
+}
 
 export interface Profile {
   sex: Sex; age: number;
@@ -23,6 +69,7 @@ export interface DesignState {
   presetId: PresetId | "custom";
   blocks: Block[];       // death 카드(연속·빈틈 없음) + celebration 카드
   anchors: number[];     // 그래프에서 직접 정한 변경 연령(오름차순). 이 사이는 매년 한 칸씩 보간된다
+  settings: Settings;    // 가정 세트·설계 제약
   updatedAt: number;     // 0이면 한 번도 편집하지 않은 기본 상태
 }
 
@@ -38,20 +85,20 @@ export const termOf = (p: Profile) => omegaOf(p.sex) - p.age;
 /** 마지막 사망보장 연령 = ω − 1 */
 export const endAgeOf = (p: Profile) => omegaOf(p.sex) - 1;
 
-export function presetContext(p: Profile): PresetContext {
+export function presetContext(p: Profile, env: EnvelopeParams = DEFAULT_ENVELOPE): PresetContext {
   return {
     age: p.age, n: termOf(p),
     youngestChildAge: p.childrenAges.length ? Math.min(...p.childrenAges) : undefined,
     debtYears: p.debt > 0 ? p.debtYears : undefined,
     retirementAge: p.retirementAge, groupCoverEndAge: p.groupCoverEndAge,
-    growthEndAge: DEFAULT_ENVELOPE.growthEndAge,
+    growthEndAge: env.growthEndAge,
   };
 }
 
 export function initialState(): DesignState {
   return {
     version: 1, profile: DEFAULT_PROFILE, S0: 1e8, payYears: 20, waiver: true, lowSurrender: false,
-    presetId: "level", blocks: buildPreset("level", presetContext(DEFAULT_PROFILE)), anchors: [], updatedAt: 0,
+    presetId: "level", blocks: buildPreset("level", presetContext(DEFAULT_PROFILE)), anchors: [], settings: DEFAULT_SETTINGS, updatedAt: 0,
   };
 }
 export const DEFAULT_STATE: DesignState = initialState();
@@ -61,18 +108,18 @@ export function toEngineInput(s: DesignState): EngineInput {
 }
 
 /** 현재 가정 세트·위험률표로 설계 상태를 산출한다 */
-export const evaluate = (s: DesignState): EngineResult => compute(toEngineInput(s), getAssumption(ASSUMPTION_ID), TABLE);
+export const evaluate = (s: DesignState): EngineResult => compute(toEngineInput(s), assumptionOf(s), TABLE);
 
 export const STEP = 0.1;               // 그래프 1칸 = 기준보험금의 10%
 export const CELEBRATION_RATIO = 0.1;  // 축하금 = 해당 연령 사망보험금의 10%
 const r4 = (x: number) => Math.round(x * 1e4) / 1e4;
 
 /** 첫 편집 가능 연령 = 가입연령 + 초기 고정 연수(E01) */
-export const firstEditableAge = (p: Profile) => p.age + DEFAULT_ENVELOPE.fixYears;
+export const firstEditableAge = (p: Profile, env: EnvelopeParams = DEFAULT_ENVELOPE) => p.age + env.fixYears;
 /** 연도별 사망보험금 배수 S_t (t = 0..n−1) */
 export const levels = (s: DesignState): number[] => expandBlocks(s.blocks, s.profile.age, termOf(s.profile)).S;
 /** 하한 배수: E05 감액 하한과 E06 최소 금액 중 큰 쪽 */
-export const floorMultiple = (S0: number) => Math.max(DEFAULT_ENVELOPE.minMultiple, DEFAULT_ENVELOPE.minAmount / S0);
+export const floorMultiple = (S0: number, env: EnvelopeParams = DEFAULT_ENVELOPE) => Math.max(env.minMultiple, env.minAmount / S0);
 
 export interface AllowedRange { editable: boolean; prev: number; ref: number; steps: number; min: number; max: number }
 /** 드래그 한 번 동안 고정되는 기준: 드래그 시작 시점의 배수 벡터와 변경점 */
@@ -83,8 +130,8 @@ export const parseAgeList = (text: string, min: number, max: number): number[] =
   [...new Set(text.split(/[,\s]+/).filter(Boolean).map(Number).filter((a) => Number.isInteger(a) && a >= min && a <= max))].sort((u, v) => u - v);
 
 /** 첫 편집 연령 뒤·최종연령 안의 유효한 변경점만 오름차순으로 */
-export const cleanAnchors = (anchors: unknown, p: Profile): number[] =>
-  [...new Set((Array.isArray(anchors) ? anchors : []).filter((a): a is number => Number.isFinite(a) && a > firstEditableAge(p) && a <= endAgeOf(p)))].sort((u, v) => u - v);
+export const cleanAnchors = (anchors: unknown, p: Profile, env: EnvelopeParams = DEFAULT_ENVELOPE): number[] =>
+  [...new Set((Array.isArray(anchors) ? anchors : []).filter((a): a is number => Number.isFinite(a) && a > firstEditableAge(p, env) && a <= endAgeOf(p)))].sort((u, v) => u - v);
 
 /**
  * 연령 A에서 그래프로 움직일 수 있는 범위.
@@ -94,7 +141,8 @@ export const cleanAnchors = (anchors: unknown, p: Profile): number[] =>
  */
 export function allowedRange(s: DesignState, ageAt: number, base?: LevelBase): AllowedRange {
   const x = s.profile.age, S = base?.S ?? levels(s), anchors = base?.anchors ?? s.anchors;
-  const first = firstEditableAge(s.profile), end = endAgeOf(s.profile);
+  const env = envelopeOf(s);
+  const first = firstEditableAge(s.profile, env), end = endAgeOf(s.profile);
   const t = ageAt - x;
   if (ageAt < first || ageAt > end) {
     const prev = S[clamp(t, 0, S.length - 1)];
@@ -105,8 +153,8 @@ export function allowedRange(s: DesignState, ageAt: number, base?: LevelBase): A
   const steps = ageAt - ref;
   return {
     editable: true, prev, ref, steps,
-    min: r4(Math.max(floorMultiple(s.S0), prev - steps * STEP)),
-    max: r4(Math.min(DEFAULT_ENVELOPE.maxMultiple, prev + steps * STEP)),
+    min: r4(Math.max(floorMultiple(s.S0, env), prev - steps * STEP)),
+    max: r4(Math.min(env.maxMultiple, prev + steps * STEP)),
   };
 }
 
@@ -207,6 +255,7 @@ export type Action =
   | { type: "celebration"; index: number; patch: { fromAge: number } }
   | { type: "removeCelebration"; index: number }
   | { type: "level"; age: number; multiple: number; base?: LevelBase }
+  | { type: "settings"; patch: Partial<Settings> }
   | { type: "autoFix"; code: AutoFixCode };
 
 export function reducer(s: DesignState, a: Action): DesignState {
@@ -216,24 +265,33 @@ export function reducer(s: DesignState, a: Action): DesignState {
       const raw = a.state as Partial<DesignState> | null | undefined;
       const profile = clampProfile({ ...DEFAULT_PROFILE, ...raw?.profile });
       const blocks = Array.isArray(raw?.blocks) ? raw.blocks : [];
-      const merged: DesignState = { ...DEFAULT_STATE, ...raw, profile };
+      const settings = sanitizeSettings(raw?.settings);
+      const merged: DesignState = { ...DEFAULT_STATE, ...raw, profile, settings };
       const payYears = clamp(Math.round(Number(merged.payYears)), 1, termOf(profile));
       const S0 = roundS0(Number(merged.S0));
-      const anchors = cleanAnchors(merged.anchors, profile);
+      const anchors = cleanAnchors(merged.anchors, profile, settings.envelope);
       return { ...withBlocks({ ...merged, payYears, S0, anchors }, deathSegments(blocks), celebrations(blocks)), updatedAt: merged.updatedAt };
     }
-    case "reset": return initialState();
+    case "reset": return { ...initialState(), settings: s.settings };
     case "profile": {
       const profile = clampProfile({ ...s.profile, ...a.patch });
-      const next = { ...s, profile, anchors: cleanAnchors(s.anchors, profile) };
-      const deaths = s.presetId === "custom" ? deathSegments(s.blocks) : buildPreset(s.presetId, presetContext(profile));
+      const next = { ...s, profile, anchors: cleanAnchors(s.anchors, profile, envelopeOf(s)) };
+      const deaths = s.presetId === "custom" ? deathSegments(s.blocks) : buildPreset(s.presetId, presetContext(profile, envelopeOf(s)));
       return withBlocks(next, deaths, celebrations(s.blocks));
     }
     case "S0": return touch({ S0: roundS0(a.S0) });
     case "payYears": return touch({ payYears: clamp(Math.round(a.payYears), 1, termOf(s.profile)) });
     case "waiver": return touch({ waiver: a.on });
     case "lowSurrender": return touch({ lowSurrender: a.on });
-    case "preset": return withBlocks({ ...s, anchors: [] }, buildPreset(a.id, presetContext(s.profile)), celebrations(s.blocks), a.id);
+    case "preset": return withBlocks({ ...s, anchors: [] }, buildPreset(a.id, presetContext(s.profile, envelopeOf(s))), celebrations(s.blocks), a.id);
+    case "settings": {
+      const merged = sanitizeSettings({ ...s.settings, ...a.patch });
+      const baseId = s.settings.assumption.id === "custom" ? (s.settings.assumption.label.match(/기본: ([\w-]+)/)?.[1] ?? ASSUMPTION_ID) : s.settings.assumption.id;
+      const known = ASSUMPTIONS.find((x) => x.id === merged.assumption.id);
+      const assumption = known && JSON.stringify(known) === JSON.stringify(merged.assumption) ? known : customize(merged.assumption, baseId);
+      const settings = { ...merged, assumption };
+      return { ...touch({ settings }), anchors: cleanAnchors(s.anchors, s.profile, settings.envelope) };
+    }
     case "segment": {
       if (!deathSegments(s.blocks)[a.index]) return s;
       const d = deathSegments(s.blocks).map((b, i) => i !== a.index ? b : {
@@ -279,7 +337,7 @@ export function reducer(s: DesignState, a: Action): DesignState {
       const t = a.age - x, tRef = r.ref - x;
       // 변경점 A의 수준은 A−1에 도달한 값이다. 뒤 구간은 그 수준의 변화폭만큼 함께 움직인다
       const delta = r4(target - S[t - 1]);
-      const lo = floorMultiple(s.S0), hi = DEFAULT_ENVELOPE.maxMultiple;
+      const lo = floorMultiple(s.S0, envelopeOf(s)), hi = envelopeOf(s).maxMultiple;
       const next = S.slice();
       // ref~A−1: prev로 두었다가 A 직전 k년 동안 매년 한 칸씩 target까지 계단식으로 이동
       const k = Math.round(Math.abs(target - r.prev) / STEP), sign = Math.sign(target - r.prev);
@@ -287,7 +345,7 @@ export function reducer(s: DesignState, a: Action): DesignState {
       // A 이후: 같은 폭만큼 함께 이동, 상·하한에서 정지
       for (let i = t; i < n; i++) next[i] = r4(clamp(S[i] + delta, lo, hi));
       const unchangedFromBase = next.every((v, i) => v === S[i]);
-      const anchors = unchangedFromBase ? anchors0 : cleanAnchors([...anchors0, a.age], s.profile);
+      const anchors = unchangedFromBase ? anchors0 : cleanAnchors([...anchors0, a.age], s.profile, envelopeOf(s));
       const cur = levels(s);
       const same = next.every((v, i) => v === cur[i]) && anchors.length === s.anchors.length && anchors.every((v, i) => v === s.anchors[i]);
       if (same) return s;
@@ -296,9 +354,9 @@ export function reducer(s: DesignState, a: Action): DesignState {
     case "autoFix": {
       const d = deathSegments(s.blocks);
       if (a.code === "E01") {
-        d[0] = { ...d[0], toAge: Math.max(d[0].toAge, s.profile.age + DEFAULT_ENVELOPE.fixYears - 1) };
+        d[0] = { ...d[0], toAge: Math.max(d[0].toAge, s.profile.age + envelopeOf(s).fixYears - 1) };
       } else {
-        const { minMultiple, maxMultiple } = DEFAULT_ENVELOPE;
+        const { minMultiple, maxMultiple } = envelopeOf(s);
         for (let i = 0; i < d.length; i++) d[i] = { ...d[i], multiple: clamp(d[i].multiple, minMultiple, maxMultiple) };
       }
       return withBlocks({ ...s, anchors: [] }, d, celebrations(s.blocks), "custom");

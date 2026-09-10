@@ -1,13 +1,13 @@
 "use client";
 import { useDesign } from "@/components/design-provider";
 import { Button, NumInput } from "@/components/ui";
-import { FIX_YEARS } from "@/lib/engine";
 import { won } from "@/lib/format";
-import { celebrations, deathSegments, endAgeOf } from "@/lib/state";
+import { celebrations, deathSegments, endAgeOf, envelopeOf } from "@/lib/state";
 
 export function BlockCards() {
   const { state, dispatch, violations } = useDesign();
   const age = state.profile.age, endAge = endAgeOf(state.profile);
+  const env = envelopeOf(state), fix = env.fixYears;
   const segs = deathSegments(state.blocks), cels = celebrations(state.blocks);
   const yearsOf = (codes: string[]) => new Set(violations.flatMap((v) => (v.year === undefined || !codes.includes(v.code) ? [] : [age + v.year])));
   const badSeg = yearsOf(["E01", "E02", "E03"]);
@@ -17,12 +17,12 @@ export function BlockCards() {
   return (
     <details open={state.presetId === "custom"} className="rounded-lg border border-navy/10 bg-white p-4 shadow-sm">
       <summary className="cursor-pointer font-display text-lg text-navy">구간 카드 편집</summary>
-      <p className="mt-1 text-xs text-navy/50">초기 {FIX_YEARS}년({age}~{age + FIX_YEARS - 1}세)은 고정, 증액은 연 20% 이내·70세 전까지.</p>
+      <p className="mt-1 text-xs text-navy/50">초기 {fix}년({age}~{age + fix - 1}세)은 고정, 증액은 연 {Math.round(env.maxGrowth * 100)}% 이내·{env.growthEndAge}세 전까지.</p>
 
       <ul className="mt-3 space-y-2">
         {segs.map((b, i) => {
           const last = i === segs.length - 1;
-          const tone = isBad(b.fromAge, b.toAge) ? "border-red-300 bg-red-50" : b.fromAge < age + FIX_YEARS ? "border-navy/10 bg-sky/5" : "border-navy/10";
+          const tone = isBad(b.fromAge, b.toAge) ? "border-red-300 bg-red-50" : b.fromAge < age + fix ? "border-navy/10 bg-sky/5" : "border-navy/10";
           return (
             <li key={`${b.fromAge}-${i}`} className={`grid grid-cols-[auto_1fr_1fr_auto] items-center gap-2 rounded border p-2 text-sm ${tone}`}>
               <span className="font-mono text-navy/70">{b.fromAge}세 ~</span>

@@ -1,9 +1,8 @@
 "use client";
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { useDesign } from "@/components/design-provider";
-import { DEFAULT_ENVELOPE } from "@/lib/engine";
 import { won } from "@/lib/format";
-import { allowedRange, celebrations, endAgeOf, firstEditableAge, STEP, type LevelBase } from "@/lib/state";
+import { allowedRange, celebrations, endAgeOf, envelopeOf, firstEditableAge, STEP, type LevelBase } from "@/lib/state";
 
 const M = { left: 64, right: 16, top: 18, bottom: 28 };
 const r4 = (x: number) => Math.round(x * 1e4) / 1e4;
@@ -36,8 +35,9 @@ export function ScheduleEditor({ height, amount }: { height: number; amount: boo
   const drag = useRef<{ age: number; base: LevelBase } | null>(null);
 
   const x0 = state.profile.age, n = result.n, S = result.S, S0 = state.S0;
-  const first = firstEditableAge(state.profile), endAge = endAgeOf(state.profile);
-  const yMax = Math.max(DEFAULT_ENVELOPE.maxMultiple, Math.ceil((Math.max(...S) + 0.3) * 2) / 2);
+  const env = envelopeOf(state);
+  const first = firstEditableAge(state.profile, env), endAge = endAgeOf(state.profile);
+  const yMax = Math.max(env.maxMultiple, Math.ceil((Math.max(...S) + 0.3) * 2) / 2);
   const W = Math.max(width, 320), H = height;
   const pw = W - M.left - M.right, ph = H - M.top - M.bottom;
   const xs = (age: number) => M.left + ((age - x0) / n) * pw;
