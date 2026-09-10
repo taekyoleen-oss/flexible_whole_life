@@ -12,7 +12,7 @@ export function ScheduleChart() {
   const k = amount ? state.S0 : 1;
   const age = state.profile.age;
   const data: { age: number; death: number | null; celebration: number | null }[] = result.S.map((s, t) => ({ age: age + t, death: s * k, celebration: result.C[t] > 0 ? result.C[t] * k : null }));
-  data.push({ age: age + result.n, death: null, celebration: result.C[result.n] > 0 ? result.C[result.n] * k : null });
+  data.push({ age: age + result.n, death: result.S[result.n - 1] * k, celebration: result.C[result.n] > 0 ? result.C[result.n] * k : null });
   const fmt = (v: number) => (amount ? won(v) : mult(v));
   return (
     <Card title="보험금 스케줄">

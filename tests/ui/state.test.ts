@@ -59,6 +59,8 @@ describe("effective (고객 실납입 기준 요약)", () => {
     expect(eff.isLow).toBe(true);
     expect(eff.monthly).toBe(r.lowSurrender!.monthlyGross);
     expect(eff.monthly).toBeLessThan(r.monthly.gross);
+    expect(eff.paid[s.payYears]).toBe(eff.totalPaid);
+    expect(eff.totalPaid).toBeLessThan(r.totalPaid);
   });
 });
 

@@ -23,7 +23,7 @@ export default function DesignPage() {
   return (
     <>
       <div className="mb-4 flex gap-2 lg:hidden">
-        {TABS.map((t) => <Button key={t} primary={tab === t} onClick={() => setTab(t)}>{t}</Button>)}
+        {TABS.map((t) => <Button key={t} primary={tab === t} aria-pressed={tab === t} onClick={() => setTab(t)}>{t}</Button>)}
       </div>
       <div className="grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)_360px]">
         {col("입력", <><InputSummary /><BudgetPanel /></>)}

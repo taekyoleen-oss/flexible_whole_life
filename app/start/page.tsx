@@ -32,7 +32,7 @@ export default function StartPage() {
 
       <Card title="2. 가족">
         <Field label="자녀 나이" hint="쉼표로 구분. 예: 3, 6 (없으면 비움)">
-          <Input defaultValue={kids} placeholder="3, 6"
+          <Input key={kids} defaultValue={kids} placeholder="3, 6"
             onBlur={(e) => { const a = parseAges(e.target.value); e.target.value = a.join(", "); setP({ childrenAges: a }); }}
             onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }} />
         </Field>

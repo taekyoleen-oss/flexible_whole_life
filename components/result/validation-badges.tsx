@@ -1,8 +1,9 @@
 "use client";
 import { useDesign } from "@/components/design-provider";
 import { Button } from "@/components/ui";
+import type { AutoFixCode } from "@/lib/state";
 
-const AUTO = new Set(["E01", "E04", "E05"]);
+const AUTO: readonly AutoFixCode[] = ["E01", "E04", "E05"];
 
 export function ValidationBadges() {
   const { violations, dispatch } = useDesign();
@@ -13,7 +14,7 @@ export function ValidationBadges() {
         <li key={v.code} className="rounded border border-red-200 bg-red-50 p-3 text-sm">
           <div className="font-medium text-red-800">{v.code} · {v.message}</div>
           <div className="text-red-700/80">{v.suggestion}</div>
-          {AUTO.has(v.code) && <Button className="mt-2" onClick={() => dispatch({ type: "autoFix", code: v.code as "E01" | "E04" | "E05" })}>자동 수정</Button>}
+          {AUTO.includes(v.code as AutoFixCode) && <Button className="mt-2" onClick={() => dispatch({ type: "autoFix", code: v.code as AutoFixCode })}>자동 수정</Button>}
         </li>
       ))}
     </ul>

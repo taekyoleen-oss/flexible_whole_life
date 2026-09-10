@@ -17,7 +17,7 @@ export interface EngineResult {
   reserve100k: number[]; reserveStd100k: number[];
   surrender: SurrenderResult;
   expenseFlow: number[];                     // 연도별 사업비(원), t=0..n-1
-  lowSurrender?: { deltaP100k: number; gross100k: number; monthlyGross: number; cash: number[]; rate: number[] };
+  lowSurrender?: { deltaP100k: number; gross100k: number; monthlyGross: number; cash: number[]; rate: number[]; paid: number[] };
   meta: { assumptionId: string; assumptionVersion: string; waiver: boolean; lowSurrender: boolean };
 }
 
@@ -75,8 +75,9 @@ export function compute(input: EngineInput, a: AssumptionSet, table: RateTable):
     const p2 = premium(k, c, e, ls.deltaP);
     const gross100k = r0(p2.gross);
     const cash = ls.cashUnit.map((w) => Math.round(w * input.S0));
-    const rate = cash.map((w, t) => { const paid = Math.min(t, c.payYears) * freq * gross100k * units; return paid > 0 ? w / paid : 0; });
-    result.lowSurrender = { deltaP100k: r0(ls.deltaP), gross100k, monthlyGross: gross100k * units, cash, rate };
+    const paid = cash.map((_, t) => Math.min(t, c.payYears) * freq * gross100k * units);
+    const rate = cash.map((w, t) => (paid[t] > 0 ? w / paid[t] : 0));
+    result.lowSurrender = { deltaP100k: r0(ls.deltaP), gross100k, monthlyGross: gross100k * units, cash, rate, paid };
   }
   return result;
 }

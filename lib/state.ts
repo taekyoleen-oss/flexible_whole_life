@@ -67,13 +67,15 @@ export function effective(r: EngineResult, payYears: number) {
   const low = r.lowSurrender;
   const gross100k = low?.gross100k ?? r.per100k.gross;
   const monthly = low?.monthlyGross ?? r.monthly.gross;
+  const paid = low?.paid ?? r.surrender.paid;
   return {
     isLow: low !== undefined,
     gross100k,
     monthly,
-    totalPaid: monthly * 12 * payYears, // 12 = 월납; 앱은 freq를 12로 고정한다
+    totalPaid: paid[Math.min(payYears, paid.length - 1)],
     cash: low?.cash ?? r.surrender.cash,
     rate: low?.rate ?? r.surrender.rate,
+    paid,
     standardMonthly: r.monthly.gross,
   };
 }
@@ -119,6 +121,8 @@ function withBlocks(s: DesignState, deaths: Block[], cels: Block[], presetId: De
   return { ...s, blocks: [...d, ...c], presetId, updatedAt: Date.now() };
 }
 
+export type AutoFixCode = "E01" | "E04" | "E05";
+
 export type Action =
   | { type: "load"; state: DesignState }
   | { type: "reset" }
@@ -134,7 +138,7 @@ export type Action =
   | { type: "addCelebration"; age: number; multiple: number }
   | { type: "celebration"; index: number; patch: { fromAge?: number; multiple?: number } }
   | { type: "removeCelebration"; index: number }
-  | { type: "autoFix"; code: "E01" | "E04" | "E05" };
+  | { type: "autoFix"; code: AutoFixCode };
 
 export function reducer(s: DesignState, a: Action): DesignState {
   const touch = (patch: Partial<DesignState>): DesignState => ({ ...s, ...patch, updatedAt: Date.now() });
