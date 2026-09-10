@@ -37,7 +37,7 @@ export default function SettingsPage() {
             {ASSUMPTIONS.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}
           </Select>
         </Field>
-        <p className="mt-1 text-xs text-navy/60">현재: {a.label} ({a.version})</p>
+        <p className="mt-1 text-xs text-navy/60">현재: {a.label}{a.id === "custom" ? "" : ` (${a.version})`}</p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <Pct label="예정이율" value={a.interest} onCommit={(v) => setA({ interest: v })} />
           <Pct label="표준이율 (표준 준비금)" value={a.standardInterest} onCommit={(v) => setA({ standardInterest: v })} />
