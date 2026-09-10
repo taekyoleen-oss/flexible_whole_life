@@ -1,32 +1,36 @@
 "use client";
-import Link from "next/link";
-import { Fragment } from "react";
 import { useDesign } from "@/components/design-provider";
-import { Card } from "@/components/ui";
+import { Card, NumInput, Select } from "@/components/ui";
 import { manwon } from "@/lib/format";
-import { ApplyInfoButton } from "./apply-info";
+import type { Profile } from "@/lib/state";
+import { FinanceButton } from "./apply-info";
 
-/** 입력 요약. 조건이 있는 항목은 설계에 반영됐는지(반영/미반영) 표시하고, "입력 정보 반영"으로 한 번에 적용한다 */
+/** 피보험자 기본 정보를 설계 화면에서 바로 편집한다. 자녀·부채·은퇴시기는 프리셋 카드에서, 재무 정보는 팝업에서 */
 export function InputSummary() {
-  const { state } = useDesign();
+  const { state, dispatch } = useDesign();
   const p = state.profile, f = state.infoApplied;
-  const tag = (on: boolean) => on ? <span className="ml-2 rounded bg-sky/10 px-1.5 py-0.5 text-xs text-sky">반영</span> : <span className="ml-2 rounded bg-navy/5 px-1.5 py-0.5 text-xs text-navy/50">미반영</span>;
-  const rows: [string, string, boolean | null][] = [
-    ["피보험자", `${p.age}세 ${p.sex === "M" ? "남" : "여"}${p.hasSpouse ? " · 배우자" : ""}`, null],
-    ["자녀", p.childrenAges.length ? p.childrenAges.map((a) => `${a}세`).join(", ") : "없음", p.childrenAges.length ? f.child : null],
-    ["연소득", manwon(p.income), p.income > 0 ? f.income : null],
-    ["부채", p.debt > 0 ? `${manwon(p.debt)} · ${p.debtYears}년` : "없음", p.debt > 0 ? f.debt : null],
-    ["기존 보장", p.groupCover + p.termCover > 0 ? manwon(p.groupCover + p.termCover) : "없음", p.groupCover > 0 ? f.group : p.termCover > 0 ? f.income : null],
-    ["은퇴", `${p.retirementAge}세`, f.retire],
-  ];
+  const setP = (patch: Partial<Profile>) => dispatch({ type: "profile", patch });
+  const tag = (on: boolean) => on ? <span className="ml-1 rounded bg-sky/10 px-1.5 py-0.5 text-xs text-sky">반영</span> : <span className="ml-1 rounded bg-navy/5 px-1.5 py-0.5 text-xs text-navy/50">미반영</span>;
   return (
-    <Card title={<span className="flex items-center justify-between">입력 요약 <Link href="/start" className="font-sans text-sm text-sky hover:underline">수정</Link></span>}>
-      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-        {rows.map(([k, v, on]) => <Fragment key={k}><dt className="text-navy/60">{k}</dt><dd>{v}{on !== null && tag(on)}</dd></Fragment>)}
+    <Card title="피보험자">
+      <div className="grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-2 text-sm">
+        <span className="text-navy/60">성별</span>
+        <Select value={p.sex} onChange={(e) => setP({ sex: e.target.value as Profile["sex"] })}><option value="M">남</option><option value="F">여</option></Select>
+        <span className="text-navy/60">연령</span>
+        <div className="flex items-center gap-1"><NumInput value={p.age} min={15} max={70} onCommit={(v) => setP({ age: v })} /><span className="text-navy/60">세</span></div>
+        <span className="text-navy/60">배우자</span>
+        <label className="flex items-center gap-2"><input type="checkbox" className="accent-sky" checked={p.hasSpouse} onChange={(e) => setP({ hasSpouse: e.target.checked })} />있음</label>
+      </div>
+      <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+        <dt className="text-navy/60">자녀</dt><dd>{p.childrenAges.length ? p.childrenAges.map((a) => `${a}세`).join(", ") : "없음"}{p.childrenAges.length > 0 && tag(f.child)}</dd>
+        <dt className="text-navy/60">부채</dt><dd>{p.debt > 0 ? `${manwon(p.debt)} · ${p.debtYears}년` : "없음"}{p.debt > 0 && tag(f.debt)}</dd>
+        <dt className="text-navy/60">은퇴시기</dt><dd>{p.retirementAge}세{tag(f.retire)}</dd>
+        <dt className="text-navy/60">연소득</dt><dd>{p.income > 0 ? manwon(p.income) : "없음"}{p.income > 0 && tag(f.income)}</dd>
+        <dt className="text-navy/60">기존 보장</dt><dd>{p.groupCover + p.termCover > 0 ? manwon(p.groupCover + p.termCover) : "없음"}</dd>
       </dl>
-      <div className="mt-3 flex items-center gap-2">
-        <ApplyInfoButton />
-        <span className="text-xs text-navy/50">설계는 1억·표준 경계로 시작합니다. 누르면 미반영 항목을 골라 적용합니다.</span>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <FinanceButton />
+        <span className="text-xs text-navy/50">자녀·부채·은퇴시기·연소득 반영은 프리셋 카드에서 합니다.</span>
       </div>
     </Card>
   );

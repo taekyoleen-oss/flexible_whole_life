@@ -23,7 +23,6 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           <header className="border-b border-navy/10 bg-white">
             <nav className="mx-auto flex max-w-[1536px] items-center gap-6 px-4 py-3">
               <Link href="/" className="font-display text-xl text-navy">설계형 종신보험</Link>
-              <Link href="/start" className="text-sm text-navy/70 hover:text-navy">입력</Link>
               <Link href="/design" className="text-sm text-navy/70 hover:text-navy">설계</Link>
               <Link href="/compare" className="text-sm text-navy/70 hover:text-navy">비교</Link>
               <Link href="/print" className="text-sm text-navy/70 hover:text-navy">제안서</Link>

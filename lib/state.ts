@@ -87,10 +87,10 @@ export const termOf = (p: Profile) => omegaOf(p.sex) - p.age;
 export const endAgeOf = (p: Profile) => omegaOf(p.sex) - 1;
 
 /** 입력 정보 중 설계에 반영한 항목. 기본은 모두 false — 프리셋은 표준 경계로 그린다 */
-export interface InfoApplied { child: boolean; debt: boolean; group: boolean; retire: boolean; income: boolean }   // income: 기준보험금을 연소득 기반(니즈·HLV)으로 정했는지
-export const NO_INFO: InfoApplied = { child: false, debt: false, group: false, retire: false, income: false };
+export interface InfoApplied { child: boolean; debt: boolean; retire: boolean; income: boolean }   // retire: 은퇴시기(은퇴증액형·단체보험보완형 공유), income: 기준보험금을 연소득 기반(니즈·HLV)으로 정했는지
+export const NO_INFO: InfoApplied = { child: false, debt: false, retire: false, income: false };
 /** 표준 경계(가입 후 경과년 기준): 자녀 독립 20년 후(막내 5세 가정), 부채 만기 20년(5년 후부터 15년 감액), 단체보험 60세, 은퇴 65세 */
-export const STANDARD_BOUNDARY = { youngestChildAge: 5, debtYears: 20, groupCoverEndAge: 60, retirementAge: 65 } as const;
+export const STANDARD_BOUNDARY = { youngestChildAge: 5, debtYears: 20, retirementAge: 65 } as const;   // 단체보험 만기 = 은퇴시기
 
 /** 프리셋 경계. 반영 플래그가 켜진 항목만 프로필 값을 쓰고 나머지는 표준 경계 */
 export function presetContext(p: Profile, env: EnvelopeParams = DEFAULT_ENVELOPE, applied: InfoApplied = NO_INFO): PresetContext {
@@ -100,7 +100,7 @@ export function presetContext(p: Profile, env: EnvelopeParams = DEFAULT_ENVELOPE
     youngestChildAge: applied.child && hasChild ? Math.min(...p.childrenAges) : STANDARD_BOUNDARY.youngestChildAge,
     debtYears: applied.debt && p.debt > 0 ? p.debtYears : STANDARD_BOUNDARY.debtYears,
     retirementAge: applied.retire ? p.retirementAge : STANDARD_BOUNDARY.retirementAge,
-    groupCoverEndAge: applied.group ? p.groupCoverEndAge : STANDARD_BOUNDARY.groupCoverEndAge,
+    groupCoverEndAge: applied.retire ? p.retirementAge : STANDARD_BOUNDARY.retirementAge,   // 단체보험은 퇴직(은퇴시기)에 끝난다
     growthEndAge: env.growthEndAge,
   };
 }
@@ -283,7 +283,7 @@ export function reducer(s: DesignState, a: Action): DesignState {
       const S0 = roundS0(Number(merged.S0));
       const anchors = cleanAnchors(merged.anchors, profile, settings.envelope);
       const ia = (raw?.infoApplied ?? {}) as Partial<Record<keyof InfoApplied, unknown>>;
-      const infoApplied: InfoApplied = { child: ia.child === true, debt: ia.debt === true, group: ia.group === true, retire: ia.retire === true, income: ia.income === true };
+      const infoApplied: InfoApplied = { child: ia.child === true, debt: ia.debt === true, retire: ia.retire === true, income: ia.income === true };
       merged.infoApplied = infoApplied;
       return { ...withBlocks({ ...merged, payYears, S0, anchors }, deathSegments(blocks), celebrations(blocks)), updatedAt: merged.updatedAt };
     }

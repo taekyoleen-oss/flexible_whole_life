@@ -1,67 +1,71 @@
 "use client";
-import { useRef, useState } from "react";
+import { Fragment, useRef, useState } from "react";
 import { useDesign } from "@/components/design-provider";
-import { Button } from "@/components/ui";
+import { FormulaHelp } from "@/components/formula-help";
+import { Button, Field, ManwonInput } from "@/components/ui";
 import { PRESETS } from "@/lib/engine";
 import { won } from "@/lib/format";
-import { boundaryLabel } from "@/lib/preset-info";
 import { recommend } from "@/lib/recommend";
-import type { InfoApplied } from "@/lib/state";
-
-const BOUNDARIES: { key: keyof InfoApplied; label: string }[] = [
-  { key: "child", label: "자녀 독립" }, { key: "debt", label: "부채 만기" }, { key: "group", label: "단체보험 만기" }, { key: "retire", label: "은퇴 연령" },
-];
+import type { Profile } from "@/lib/state";
 
 /**
- * "입력 정보 반영" 버튼 + 팝업. 설계는 기준보험금 1억·표준 경계로 시작하고, 입력 화면의 정보는 여기서 체크한 항목만 적용한다.
- * 열 때 반영 가능한 항목을 모두 체크해 두므로 "적용"만 누르면 전체가 반영되고, 적용 결과는 프리셋 카드의 체크박스와 입력 요약의 반영/미반영 표시에 그대로 나타난다.
+ * "재무정보·기준보험금" 버튼 + 팝업. 연소득·유동자산·기존 보장을 입력하면 니즈·HLV 기준보험금 후보가 계산되고,
+ * 고른 금액과 추천 프리셋을 "적용"으로 설계에 반영한다. 설계는 1억으로 시작하므로 적용 전에는 연소득이 "미반영"이다.
  */
-export function ApplyInfoButton({ label = "입력 정보 반영" }: { label?: string }) {
+export function FinanceButton({ compact = false }: { compact?: boolean }) {
   const { state, dispatch } = useDesign();
   const dlg = useRef<HTMLDialogElement>(null);
+  const p = state.profile;
   const r = recommend(state);
-  const rows = BOUNDARIES.map((b) => ({ ...b, ...boundaryLabel(b.key, state) }));
-  const [flags, setFlags] = useState<Partial<InfoApplied>>({});
-  const [amount, setAmount] = useState<"keep" | "needs" | "hlv">("needs");
-  const [usePreset, setUsePreset] = useState(true);
-  const open = () => {
-    setFlags(Object.fromEntries(rows.map((x) => [x.key, x.available])));   // 반영할 수 있는 항목은 모두 체크
-    setAmount(state.infoApplied.income ? "keep" : "needs");
-    setUsePreset(state.presetId !== r.presetId);
-    dlg.current?.showModal();
-  };
+  const d = r.needs.detail;
+  const [amount, setAmount] = useState<"needs" | "hlv" | "keep">("needs");
+  const [usePreset, setUsePreset] = useState(false);
+  const setP = (patch: Partial<Profile>) => dispatch({ type: "profile", patch });
+  const open = () => { setAmount(state.infoApplied.income ? "keep" : "needs"); setUsePreset(false); dlg.current?.showModal(); };
   const apply = () => {
-    dispatch({ type: "applyInfo", applied: flags, S0: amount === "needs" ? r.suggestedS0 : amount === "hlv" ? r.hlvS0 : undefined, presetId: usePreset ? r.presetId : undefined });
+    dispatch({ type: "applyInfo", applied: {}, S0: amount === "needs" ? r.suggestedS0 : amount === "hlv" ? r.hlvS0 : undefined, presetId: usePreset ? r.presetId : undefined });
     dlg.current?.close();
   };
+  const rows: [string, string][] = [
+    [`생활비 (연소득×${Math.round(state.settings.assumption.needs.livingRatio * 100)}% × ${r.needs.yearsToIndependence}년 현가)`, won(d.living)],
+    ["자녀 교육·결혼", won(d.education)], ["부채 상환", won(d.debt)], ["정리 자금", won(d.finalExpense)], ["− 기존 보장·유동자산", `−${won(d.offset)}`],
+  ];
   return (
     <>
-      <Button primary onClick={open}>{label}</Button>
-      <dialog ref={dlg} className="m-auto w-[min(92vw,600px)] rounded-lg bg-white p-5 text-left shadow-xl backdrop:bg-navy/50" onClick={(e) => { if (e.target === e.currentTarget) e.currentTarget.close(); }}>
-        <h3 className="font-display text-lg text-navy">입력 정보 반영</h3>
-        <p className="mt-1 text-xs text-navy/60">체크한 항목이 설계에 반영됩니다. 반영한 항목은 프리셋 카드의 체크박스와 입력 요약에 &quot;반영&quot;으로 표시되고, 입력을 바꾸면 따라갑니다.</p>
+      {compact ? <button type="button" className="rounded border border-navy/20 px-1.5 py-0.5 text-xs text-navy hover:bg-navy/5" onClick={open}>입력</button> : <Button primary onClick={open}>재무정보·기준보험금</Button>}
+      <dialog ref={dlg} className="m-auto w-[min(92vw,640px)] whitespace-normal rounded-lg bg-white p-5 text-left shadow-xl backdrop:bg-navy/50" onClick={(e) => { if (e.target === e.currentTarget) e.currentTarget.close(); }}>
+        <h3 className="font-display text-lg text-navy">재무정보·기준보험금</h3>
+        <p className="mt-1 text-xs text-navy/60">설계는 기준보험금 1억으로 시작합니다. 재무 정보를 넣으면 필요보장(니즈)과 인적자본(HLV)이 계산되고, 고른 금액을 &quot;적용&quot;하면 설계의 기준보험금이 바뀝니다.</p>
 
-        <h4 className="mt-4 text-sm font-medium text-navy">프리셋 경계</h4>
-        <ul className="mt-1 space-y-1 text-sm">
-          {rows.map((x) => (
-            <li key={x.key} className="flex items-start gap-2">
-              <input id={`ai-${x.key}`} type="checkbox" className="mt-1 accent-sky" disabled={!x.available} checked={!!flags[x.key]} onChange={(e) => setFlags({ ...flags, [x.key]: e.target.checked })} />
-              <label htmlFor={`ai-${x.key}`} className={x.available ? "" : "text-navy/40"}><span className="font-medium">{x.label}</span> · {x.text}</label>
-            </li>
-          ))}
-        </ul>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <Field label="연소득"><ManwonInput value={p.income} onChange={(v) => setP({ income: v })} max={1e5} /></Field>
+          <Field label="유동자산"><ManwonInput value={p.liquidAssets} onChange={(v) => setP({ liquidAssets: v })} max={1e6} /></Field>
+          <Field label="단체보험 보험금"><ManwonInput value={p.groupCover} onChange={(v) => setP({ groupCover: v })} max={1e6} /></Field>
+          <Field label="정기보험 보험금"><ManwonInput value={p.termCover} onChange={(v) => setP({ termCover: v })} max={1e6} /></Field>
+        </div>
+        <p className="mt-1 text-xs text-navy/50">자녀 나이·부채·은퇴시기는 프리셋 카드에서 입력하며 여기 계산에도 쓰입니다.</p>
 
-        <h4 className="mt-4 text-sm font-medium text-navy">기준보험금 (연소득·기존 보장 반영)</h4>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <div>
+            <div className="text-xs text-navy/60">필요보장 (니즈) <FormulaHelp id="needs" /></div>
+            <div className="font-mono text-xl text-navy">{won(r.needs.needs)}</div>
+            <dl className="mt-1 grid grid-cols-[1fr_auto] gap-y-0.5 text-xs">{rows.map(([k, v]) => <Fragment key={k}><dt className="text-navy/60">{k}</dt><dd className="font-mono">{v}</dd></Fragment>)}</dl>
+          </div>
+          <div>
+            <div className="text-xs text-navy/60">인적자본 (HLV, 은퇴까지 {r.needs.yearsToRetirement}년) <FormulaHelp id="hlv" /></div>
+            <div className="font-mono text-xl text-navy">{won(r.needs.hlv)}</div>
+          </div>
+        </div>
+
+        <h4 className="mt-4 text-sm font-medium text-navy">기준보험금</h4>
         <ul className="mt-1 space-y-1 text-sm">
           {([["needs", `필요보장(니즈) ${won(r.suggestedS0)}`], ["hlv", `인적자본(HLV) ${won(r.hlvS0)}`], ["keep", `유지 (${won(state.S0)})`]] as const).map(([k, t]) => (
-            <li key={k} className="flex items-center gap-2"><input id={`ai-amt-${k}`} type="radio" name="ai-amount" className="accent-sky" checked={amount === k} onChange={() => setAmount(k)} /><label htmlFor={`ai-amt-${k}`}>{t}</label></li>
+            <li key={k} className="flex items-center gap-2"><input id={`fin-${k}`} type="radio" name="fin-amount" className="accent-sky" checked={amount === k} onChange={() => setAmount(k)} /><label htmlFor={`fin-${k}`}>{t}</label></li>
           ))}
         </ul>
+        <label className="mt-3 flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1 accent-sky" checked={usePreset} onChange={(e) => setUsePreset(e.target.checked)} /><span>추천 프리셋 적용 · <span className="font-medium">{PRESETS[r.presetId].label}</span> <span className="text-xs text-navy/60">{r.reason}</span></span></label>
 
-        <h4 className="mt-4 text-sm font-medium text-navy">프리셋</h4>
-        <label className="mt-1 flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1 accent-sky" checked={usePreset} onChange={(e) => setUsePreset(e.target.checked)} /><span>추천 프리셋 적용 · <span className="font-medium">{PRESETS[r.presetId].label}</span> <span className="text-xs text-navy/60">{r.reason}</span></span></label>
-
-        <div className="mt-5 flex justify-end gap-2"><Button onClick={() => dlg.current?.close()}>취소</Button><Button primary onClick={apply}>적용</Button></div>
+        <div className="mt-5 flex justify-end gap-2"><Button onClick={() => dlg.current?.close()}>닫기</Button><Button primary onClick={apply}>적용</Button></div>
       </dialog>
     </>
   );

@@ -18,7 +18,7 @@ export default function Home() {
         <p className="mt-2 text-navy/70">자녀 독립·부채 상환·은퇴·상속 시점에 맞춰 연령별 보험금을 정하면 보험료·준비금·해약환급금이 바로 계산됩니다.</p>
         <div className="mt-5 flex flex-wrap gap-2">
           {hasSaved && <Button primary onClick={() => router.push("/design")}>이어서 설계 ({state.profile.age}세 {state.profile.sex === "M" ? "남" : "여"} · 월 {won(effective(result, state.payYears).monthly)})</Button>}
-          <Button primary={!hasSaved} onClick={() => { dispatch({ type: "reset" }); router.push("/start"); }}>새 설계 시작</Button>
+          <Button primary={!hasSaved} onClick={() => { dispatch({ type: "reset" }); router.push("/design"); }}>새 설계 시작</Button>
         </div>
       </section>
       <section className="max-w-3xl"><LibraryPanel /></section>
