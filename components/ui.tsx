@@ -40,7 +40,7 @@ export function NumInput({ value, onCommit, ...rest }: Omit<InputHTMLAttributes<
   useEffect(() => setText(String(value)), [value]);
   const commit = () => {
     const n = Number(text);
-    if (text.trim() !== "" && Number.isFinite(n)) onCommit(n);
+    if (text.trim() !== "" && Number.isFinite(n) && n !== value) onCommit(n);
     setText(String(value)); // 부모가 clamp해 되돌려도 표시를 맞춘다; value가 바뀌면 effect가 다시 덮는다
   };
   return <Input {...rest} type="number" value={text} onChange={(e) => setText(e.target.value)} onBlur={commit} onKeyDown={(e) => { if (e.key === "Enter") commit(); }} />;

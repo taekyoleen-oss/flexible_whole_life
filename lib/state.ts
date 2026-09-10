@@ -72,6 +72,8 @@ export function effective(r: EngineResult, payYears: number) {
     isLow: low !== undefined,
     gross100k,
     monthly,
+    net: low ? r.monthly.net - low.deltaP100k * r.units : r.monthly.net,
+    deltaP100k: low?.deltaP100k ?? 0,
     totalPaid: paid[Math.min(payYears, paid.length - 1)],
     cash: low?.cash ?? r.surrender.cash,
     rate: low?.rate ?? r.surrender.rate,
@@ -104,8 +106,12 @@ export function normalizeSegments(segs: Block[], age: number, endAge: number): B
 function clampProfile(p: Profile): Profile {
   return {
     ...p,
+    sex: p.sex === "F" ? "F" : "M",
     age: clamp(Math.round(p.age), 15, 70),
-    childrenAges: p.childrenAges.map((a) => clamp(Math.round(a), 0, 40)).slice(0, 6),
+    childrenAges: (Array.isArray(p.childrenAges) ? p.childrenAges : [])
+      .filter((a) => Number.isFinite(a))
+      .map((a) => clamp(Math.round(a), 0, 40))
+      .slice(0, 6),
     income: Math.max(0, p.income), liquidAssets: Math.max(0, p.liquidAssets), debt: Math.max(0, p.debt),
     debtYears: clamp(Math.round(p.debtYears), 1, 40),
     retirementAge: clamp(Math.round(p.retirementAge), 40, 80),

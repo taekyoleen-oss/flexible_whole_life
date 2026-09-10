@@ -76,6 +76,15 @@ describe("불러오기", () => {
     expect(deathSegments(s.blocks)).toEqual([{ fromAge: 70, toAge: 109, multiple: 1, kind: "death" }]);
     expect(s.presetId).toBe("level");
   });
+  it("성별·자녀연령이 깨져 있어도 안전하게 clamp해서 불러온다", () => {
+    const s = reducer(initialState(), {
+      type: "load",
+      state: { version: 1, profile: { sex: "X", childrenAges: "3" } } as unknown as DesignState,
+    });
+    expect(s.profile.sex).toBe("M");
+    expect(s.profile.childrenAges).toEqual([]);
+    expect(() => evaluate(s)).not.toThrow();
+  });
 });
 
 describe("프리셋", () => {

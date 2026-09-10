@@ -10,7 +10,7 @@ export function PremiumSummary() {
   const m = state.payYears;
   const eff = effective(r, m);
   const rows: [string, string][] = [
-    ["월 순보험료", won(r.monthly.net)],
+    ["월 순보험료", won(eff.net)],
     ["총 납입보험료", won(eff.totalPaid)],
     [`납입 완료(${m}년) 환급률`, pct(eff.rate[m])],
     ["초기 보험금", won(r.S[0] * state.S0)],

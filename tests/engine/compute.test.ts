@@ -47,6 +47,25 @@ describe("G4 정기 형태 = 정기 공식", () => {
   it("순보험료 = M*/N*", () => expect(r.perUnit.net).toBeCloseTo(16212.828499 / 17378602.403207, 12));
 });
 
+describe("I-1 저해지 환급금은 표준 해약공제(newBiz) 기준을 공유한다", () => {
+  const a = ASSUMPTIONS[0];
+  const r = compute({ sex: "M", age: 40, payYears: 20, S0: 1e8, lowSurrender: true,
+    blocks: [{ fromAge: 40, toAge: 109, multiple: 1, kind: "death" }] }, a, table);
+  it("5년 초과 구간은 표준과 저해지가 (10만원당 반올림 오차 내에서) 일치한다", () => {
+    for (const t of [7, 10, 20]) {
+      expect(Math.abs(r.lowSurrender!.cash[t] - r.surrender.cash[t])).toBeLessThanOrEqual(r.units * 2);
+    }
+  });
+  it("1~5년은 저해지가 표준의 절반 수준이다", () => {
+    for (let t = 1; t <= 5; t++) {
+      const std = r.surrender.cash[t];
+      const low = r.lowSurrender!.cash[t];
+      if (std === 0 && low === 0) continue;
+      expect(Math.abs(low - 0.5 * std)).toBeLessThanOrEqual(r.units * 2);
+    }
+  });
+});
+
 describe("G5 예산 역산 왕복", () => {
   const a = ASSUMPTIONS[0];
   const blocks = [{ fromAge: 40, toAge: 109, multiple: 1, kind: "death" as const }, { fromAge: 60, toAge: 109, multiple: 0.3, kind: "death" as const }];

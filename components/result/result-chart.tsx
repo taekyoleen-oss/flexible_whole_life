@@ -20,7 +20,7 @@ export function ResultChart() {
             <Tooltip labelFormatter={(t) => `${t}년 경과`} formatter={(v: unknown) => won(Number(v))} />
             <Legend />
             <Line dataKey="paid" name="납입 누계" stroke="#94a3b8" strokeDasharray="4 3" dot={false} isAnimationActive={false} />
-            <Line dataKey="reserve" name="준비금" stroke="#4a90c2" dot={false} isAnimationActive={false} />
+            <Line dataKey="reserve" name={eff.isLow ? "준비금 (표준 기초)" : "준비금"} stroke="#4a90c2" dot={false} isAnimationActive={false} />
             <Line dataKey="cash" name={`해약환급금${eff.isLow ? " (저해지)" : ""}`} stroke="#1b2845" strokeWidth={2} dot={false} isAnimationActive={false} />
             {eff.isLow && <Line dataKey="std" name="표준형 환급금 (참고)" stroke="#94a3b8" strokeWidth={1} dot={false} isAnimationActive={false} />}
           </LineChart>

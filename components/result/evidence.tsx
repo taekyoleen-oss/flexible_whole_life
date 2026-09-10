@@ -14,8 +14,11 @@ export function Evidence() {
   const eff = effective(r, state.payYears);
   const u = r.perUnit, k = r.per100k;
   const grossLabel = r.lowSurrender ? `${k.gross.toLocaleString()}원 (저해지 적용 ${r.lowSurrender.gross100k.toLocaleString()}원)` : `${k.gross.toLocaleString()}원`;
+  const netLabel = r.lowSurrender
+    ? `${k.net.toLocaleString()}원 (저해지 적용 ${(k.net - r.lowSurrender.deltaP100k).toLocaleString()}원, 인하 ${r.lowSurrender.deltaP100k}원)`
+    : `${k.net.toLocaleString()}원`;
   const per100k: [string, string][] = [
-    ["순보험료", `${k.net.toLocaleString()}원`],
+    ["순보험료", netLabel],
     ["기준연납순보험료", `${k.base.toLocaleString()}원`],
     ["영업보험료", grossLabel],
     ["신계약비 (산출 / 표준 / 해약공제 기준)", `${k.alpha.toLocaleString()} / ${k.alphaStd.toLocaleString()} / ${k.newBiz.toLocaleString()}원`],

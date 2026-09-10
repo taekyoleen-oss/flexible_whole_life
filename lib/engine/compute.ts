@@ -71,7 +71,7 @@ export function compute(input: EngineInput, a: AssumptionSet, table: RateTable):
     meta: { assumptionId: a.id, assumptionVersion: a.version, waiver, lowSurrender: useLow },
   };
   if (useLow) {
-    const ls = lowSurrender(k, c, V, p.alpha, a.lowSurrender);
+    const ls = lowSurrender(k, c, V, per100k.newBiz / 1e5, a.lowSurrender);
     const p2 = premium(k, c, e, ls.deltaP);
     const gross100k = r0(p2.gross);
     const cash = ls.cashUnit.map((w) => Math.round(w * input.S0));
