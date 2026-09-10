@@ -2,6 +2,7 @@
 import { useState, type ReactNode } from "react";
 import { BlockCards } from "@/components/canvas/block-cards";
 import { BudgetPanel } from "@/components/canvas/budget-panel";
+import { DesignToolbar } from "@/components/canvas/design-toolbar";
 import { InputSummary } from "@/components/canvas/input-summary";
 import { PresetPicker } from "@/components/canvas/preset-picker";
 import { ScheduleChart } from "@/components/canvas/schedule-chart";
@@ -22,6 +23,7 @@ export default function DesignPage() {
   const col = (name: Tab, node: ReactNode) => <div className={`${tab === name ? "block" : "hidden"} space-y-4 lg:block`}>{node}</div>;
   return (
     <>
+      <DesignToolbar />
       <div className="mb-4 flex gap-2 lg:hidden">
         {TABS.map((t) => <Button key={t} primary={tab === t} aria-pressed={tab === t} onClick={() => setTab(t)}>{t}</Button>)}
       </div>

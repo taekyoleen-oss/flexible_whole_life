@@ -27,7 +27,7 @@ function useWidth<T extends HTMLElement>() {
  * 보험금 스케줄 편집기. 연령을 클릭·드래그하거나 화살표 키로 배수를 STEP 단위로 바꾼다.
  * 규칙(허용 범위·하한·뒤 구간 이동)은 전부 lib/state의 allowedRange·level 액션에 있다.
  */
-export function ScheduleEditor({ height, amount }: { height: number; amount: boolean }) {
+export function ScheduleEditor({ height, amount, readOnly = false }: { height: number; amount: boolean; readOnly?: boolean }) {
   const { state, dispatch, result } = useDesign();
   const [box, width] = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<number | null>(null);
@@ -95,12 +95,12 @@ export function ScheduleEditor({ height, amount }: { height: number; amount: boo
 
   return (
     <div ref={box} className="w-full select-none">
-      <svg width={W} height={H} tabIndex={0} role="application"
-        aria-label={`보험금 스케줄 편집기. ${first}세 이후 연령을 클릭하고 위아래로 드래그하거나 화살표 키로 조정`}
+      <svg width={W} height={H} tabIndex={readOnly ? -1 : 0} role={readOnly ? "img" : "application"}
+        aria-label={readOnly ? "보험금 스케줄" : `보험금 스케줄 편집기. ${first}세 이후 연령을 클릭하고 위아래로 드래그하거나 화살표 키로 조정`}
         className="block touch-none rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-sky"
-        style={{ cursor: focus !== null && focus >= first ? "ns-resize" : "default" }}
-        onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
-        onPointerLeave={() => setHover(null)} onKeyDown={onKey}>
+        style={{ cursor: !readOnly && focus !== null && focus >= first ? "ns-resize" : "default" }}
+        onPointerDown={readOnly ? undefined : onDown} onPointerMove={readOnly ? undefined : onMove} onPointerUp={readOnly ? undefined : onUp} onPointerCancel={readOnly ? undefined : onUp}
+        onPointerLeave={readOnly ? undefined : () => setHover(null)} onKeyDown={readOnly ? undefined : onKey}>
         <rect x={xs(x0)} y={M.top} width={xs(first) - xs(x0)} height={ph} fill="#4a90c2" fillOpacity={0.1} />
         {gridLevels.map((m) => (
           <line key={m} x1={M.left} x2={W - M.right} y1={ys(m)} y2={ys(m)} stroke="#1b2845" strokeOpacity={Math.round(m * 10) % 5 === 0 ? 0.15 : 0.05} />

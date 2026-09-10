@@ -24,20 +24,22 @@ function loadSaved(): DesignState | null {
   }
 }
 
-export function DesignProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(reducer, DEFAULT_STATE);
-  const [loaded, setLoaded] = useState(false);
+/** initial이 있으면 그 상태로 시작하고 localStorage를 읽지 않는다(공유 뷰). persist=false면 저장하지 않는다 */
+export function DesignProvider({ children, initial, persist = true }: { children: ReactNode; initial?: DesignState; persist?: boolean }) {
+  const [state, dispatch] = useReducer(reducer, initial ?? DEFAULT_STATE);
+  const [loaded, setLoaded] = useState(!!initial);
 
   useEffect(() => {
+    if (initial) return;
     const saved = loadSaved();
     if (saved) dispatch({ type: "load", state: saved });
     setLoaded(true);
-  }, []);
+  }, [initial]);
 
   useEffect(() => {
-    if (!loaded) return;
+    if (!loaded || !persist) return;
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch { /* 저장 불가 환경은 무시 */ }
-  }, [state, loaded]);
+  }, [state, loaded, persist]);
 
   const value = useMemo<DesignCtx>(() => {
     const result = evaluate(state);
