@@ -32,7 +32,7 @@ export function ScheduleEditor({ height, amount, readOnly = false }: { height: n
   const [box, width] = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<number | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
-  const drag = useRef<{ age: number; base: LevelBase } | null>(null);
+  const drag = useRef<{ age: number; base: LevelBase; py0: number; moved: boolean } | null>(null);   // py0: 누른 위치. 이동량을 그 기준으로 재서 살짝 눌러도 값이 튀지 않는다
 
   const x0 = state.profile.age, n = result.n, S = result.S, S0 = state.S0;
   const env = envelopeOf(state);
@@ -51,25 +51,28 @@ export function ScheduleEditor({ height, amount, readOnly = false }: { height: n
   const area = `${line} L${xs(x0 + n)},${ys(0)} L${xs(x0)},${ys(0)} Z`;
 
   const pos = (e: PointerEvent<SVGSVGElement>) => { const r = e.currentTarget.getBoundingClientRect(); return { px: e.clientX - r.left, py: e.clientY - r.top }; };
-  /** 포인터 y → prev 기준 칸 수로 양자화해 dispatch. 드래그 시작 시점(base)을 기준으로 계산하므로 되돌리면 원래대로 온다 */
-  const moveTo = (age: number, py: number, base: LevelBase) => {
-    const r = allowedRange(state, age, base);
+  /** 누른 위치에서 움직인 만큼을 칸 수로 양자화해 dispatch. 드래그 시작 시점(base)을 기준으로 계산하므로 되돌리면 원래대로 온다 */
+  const moveTo = (d: NonNullable<typeof drag.current>, py: number) => {
+    const r = allowedRange(state, d.age, d.base);
     if (!r.editable) return;
-    const k = Math.round((levelAt(py) - r.prev) / STEP);
-    dispatch({ type: "level", age, multiple: r.prev + k * STEP, base });
+    const k = Math.round((levelAt(py) - levelAt(d.py0)) / STEP);
+    if (k === 0 && !d.moved) return;   // 아직 한 칸도 안 움직였으면 손대지 않는다(더블클릭 사이의 떨림 등)
+    d.moved = true;
+    dispatch({ type: "level", age: d.age, multiple: r.prev + k * STEP, base: d.base });
   };
-  /** 클릭은 선택만 한다. 값은 움직일 때(onMove)만 바뀐다 */
+  /** 클릭은 선택만 한다. 값은 움직일 때(onMove)만 바뀐다. 더블클릭의 두 번째 누름은 드래그로 잡지 않는다 */
   const onDown = (e: PointerEvent<SVGSVGElement>) => {
-    const age = ageAt(pos(e).px);
+    const { px, py } = pos(e);
+    const age = ageAt(px);
     setSelected(age);
     e.currentTarget.focus({ preventScroll: true });
-    if (age < first) return;
-    drag.current = { age, base: { S: S.slice(), anchors: state.anchors } };
+    if (age < first || e.detail >= 2) return;
+    drag.current = { age, base: { S: S.slice(), anchors: state.anchors }, py0: py, moved: false };
     e.currentTarget.setPointerCapture(e.pointerId);
   };
   const onMove = (e: PointerEvent<SVGSVGElement>) => {
     const { px, py } = pos(e);
-    if (drag.current) moveTo(drag.current.age, py, drag.current.base);
+    if (drag.current) moveTo(drag.current, py);
     else setHover(ageAt(px));
   };
   const onUp = (e: PointerEvent<SVGSVGElement>) => {
@@ -77,7 +80,7 @@ export function ScheduleEditor({ height, amount, readOnly = false }: { height: n
     if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
   };
   /** 더블클릭: 그 연령의 값으로 이후를 평탄하게 */
-  const onDouble = (e: PointerEvent<SVGSVGElement>) => { const age = ageAt(pos(e).px); if (age >= first) dispatch({ type: "flatten", age }); };
+  const onDouble = (e: PointerEvent<SVGSVGElement>) => { drag.current = null; const age = ageAt(pos(e).px); if (age >= first) dispatch({ type: "flatten", age }); };
   const onKey = (e: KeyboardEvent<SVGSVGElement>) => {
     if (e.key === "Escape") { setSelected(null); return; }
     if (selected === null) return;
