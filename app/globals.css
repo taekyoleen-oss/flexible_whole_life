@@ -6,7 +6,7 @@
   --color-ink: #0a0a0a;
   --color-cream: #fafaf7;
   --font-sans: "Pretendard Variable", Pretendard, system-ui, sans-serif;
-  --font-display: var(--font-fraunces), Georgia, serif;
+  --font-display: var(--font-fraunces), "Pretendard Variable", Pretendard, Georgia, serif;
   --font-mono: var(--font-jetbrains), ui-monospace, monospace;
 }
 

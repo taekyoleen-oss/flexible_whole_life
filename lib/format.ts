@@ -1,4 +1,4 @@
-const grp = (x: number) => Math.round(x).toLocaleString("ko-KR");
+const grp = (x: number) => (Math.round(x) || 0).toLocaleString("ko-KR"); // -0·NaN → 0
 
 export const won = (x: number) => `${grp(x)}원`;
 export const manwon = (x: number) => `${grp(x / 1e4)}만원`;
