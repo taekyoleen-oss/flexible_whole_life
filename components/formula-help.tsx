@@ -1,5 +1,6 @@
 "use client";
 import { useRef } from "react";
+import { FormulaText } from "@/components/formula-text";
 import { Button } from "@/components/ui";
 import { getFormula, type FormulaId } from "@/lib/formulas";
 
@@ -15,12 +16,12 @@ export function FormulaHelp({ id, className = "" }: { id: FormulaId; className?:
       <dialog ref={dlg} className="m-auto w-[min(92vw,640px)] rounded-lg bg-white p-5 text-left shadow-xl backdrop:bg-navy/50"
         onClick={(e) => { if (e.target === e.currentTarget) e.currentTarget.close(); }}>
         <div className="mb-1 text-xs text-navy/50">{f.group}</div>
-        <h3 className="font-display text-lg text-navy">{f.title}</h3>
-        <pre className="mt-3 overflow-x-auto whitespace-pre-wrap rounded bg-cream p-3 font-mono text-sm text-navy">{f.formula}</pre>
-        <p className="mt-3 text-sm text-ink">{f.meaning}</p>
+        <h3 className="font-display text-lg text-navy"><FormulaText text={f.title} /></h3>
+        <FormulaText block className="mt-3" text={f.formula} />
+        <p className="mt-3 text-sm text-ink"><FormulaText text={f.meaning} /></p>
         {f.vars.length > 0 && (
           <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
-            {f.vars.map(([k, v]) => <div key={k} className="contents"><dt className="font-mono text-navy">{k}</dt><dd className="text-navy/70">{v}</dd></div>)}
+            {f.vars.map(([k, v]) => <div key={k} className="contents"><dt className="font-mono text-navy"><FormulaText text={k} /></dt><dd className="text-navy/70">{v}</dd></div>)}
           </dl>
         )}
         <p className="mt-3 text-xs text-navy/50">앱에서: {f.where}</p>

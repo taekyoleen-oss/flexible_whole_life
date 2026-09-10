@@ -39,6 +39,6 @@ export function boundaryLabel(key: keyof InfoApplied, s: DesignState): { text: s
     case "child": return { available: youngest !== null, text: youngest !== null ? `막내 ${youngest}세 → ${p.age + indep - youngest}세 독립 (표준 ${p.age + indep - STANDARD_BOUNDARY.youngestChildAge}세)` : "자녀 나이를 입력하세요" };
     case "debt": return { available: p.debt > 0, text: p.debt > 0 ? `부채 ${Math.round(p.debt / 1e4).toLocaleString()}만원 · 만기 ${p.debtYears}년 → ${p.age + p.debtYears}세 (표준 ${p.age + STANDARD_BOUNDARY.debtYears}세)` : "부채 잔액·만기를 입력하세요" };
     case "retire": return { available: true, text: `은퇴시기 ${p.retirementAge}세 (표준 ${STANDARD_BOUNDARY.retirementAge}세)` };
-    case "income": return { available: p.income > 0, text: p.income > 0 ? `연소득 ${Math.round(p.income / 1e4).toLocaleString()}만원 → 니즈 기준보험금 (표준 1억)` : "연소득을 입력하세요" };
+    case "income": return { available: p.income > 0, text: p.income > 0 ? `연소득 ${Math.round(p.income / 1e4).toLocaleString()}만원 → 니즈 기준보험금 (표준 1억, 유동자산·기존 보장 포함)` : "연소득을 입력하세요" };
   }
 }
