@@ -18,7 +18,7 @@ describe("샘플 설계 3종", () => {
   });
   it("샘플 프로필이 프리셋 경계를 만든다", () => {
     const child = buildSample(SAMPLES[0]);
-    expect(child.blocks[0]).toMatchObject({ fromAge: 35, toAge: 57, multiple: 1 }); // 막내 2세 → 25세 = 23년 후
+    expect(child.blocks[0]).toMatchObject({ fromAge: 35, toAge: 51, multiple: 1 }); // 막내 2세 → 25세 = 23년 후 0.3, 그 6년 전(17년 후)부터 감액
     const debt = buildSample(SAMPLES[1]);
     expect(debt.blocks.at(-1)).toMatchObject({ multiple: 0.3, toAge: 111 });
   });

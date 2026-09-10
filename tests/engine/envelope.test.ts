@@ -15,9 +15,9 @@ describe("프리셋 6종", () => {
       expect(new Set(S.slice(0, 5)).size, id).toBe(1);
     }
   });
-  it("자녀연령형: 막내 25세(=22년 후)부터 0.3", () => {
+  it("자녀연령형: 독립(22년 후) 6년 전부터 매년 0.1씩 내려 22년째 0.3", () => {
     const { S } = expandBlocks(buildPreset("child", ctx), 40, 70);
-    expect(S[21]).toBe(1); expect(S[22]).toBe(0.3);
+    expect(S[15]).toBe(1); expect(S[16]).toBe(0.9); expect(S[21]).toBe(0.4); expect(S[22]).toBe(0.3); expect(S[23]).toBe(0.3);
   });
   it("단체보험보완형: 60세에 1.0 도달", () => {
     const { S } = expandBlocks(buildPreset("group", ctx), 40, 70);

@@ -267,6 +267,7 @@ export type Action =
   | { type: "level"; age: number; multiple: number; base?: LevelBase }
   | { type: "settings"; patch: Partial<Settings> }
   | { type: "applyInfo"; applied: Partial<InfoApplied>; S0?: number; presetId?: PresetId }
+  | { type: "resetDesign" }
   | { type: "autoFix"; code: AutoFixCode };
 
 export function reducer(s: DesignState, a: Action): DesignState {
@@ -287,6 +288,11 @@ export function reducer(s: DesignState, a: Action): DesignState {
       return { ...withBlocks({ ...merged, payYears, S0, anchors }, deathSegments(blocks), celebrations(blocks)), updatedAt: merged.updatedAt };
     }
     case "reset": return { ...initialState(), settings: s.settings };
+    case "resetDesign": {
+      // 입력·설정·계약 조건은 두고 설계만 1억·표준 평준형으로. 변경점·축하금·입력 반영도 지운다
+      const next = { ...s, S0: 1e8, anchors: [], infoApplied: NO_INFO };
+      return withBlocks(next, buildPreset("level", presetContext(s.profile, envelopeOf(s), NO_INFO)), [], "level");
+    }
     case "profile": {
       const profile = clampProfile({ ...s.profile, ...a.patch });
       const next = { ...s, profile, anchors: cleanAnchors(s.anchors, profile, envelopeOf(s)) };

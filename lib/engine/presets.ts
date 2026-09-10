@@ -16,7 +16,7 @@ export interface PresetContext {
 
 export const PRESETS: Record<PresetId, { label: string; description: string }> = {
   level:  { label: "평준형",       description: "전 기간 같은 보험금" },
-  child:  { label: "자녀연령형",   description: "막내 독립까지 높게, 이후 30%" },
+  child:  { label: "자녀연령형",   description: "막내 독립 6년 전부터 매년 10%씩 줄여 독립 후 30%" },
   debt:   { label: "부채상환형",   description: "부채 만기까지 선형 감액, 이후 30%" },
   retire: { label: "은퇴증액형",   description: "은퇴 직전 3년간 1.5배로 증액" },
   group:  { label: "단체보험보완형", description: "단체보험 기간 50%, 만기 전 4년간 100%로" },
@@ -29,8 +29,10 @@ function multiples(id: PresetId, c: PresetContext): number[] {
   switch (id) {
     case "level": return S;
     case "child": {
+      // 독립 6년 전부터 매년 0.1씩 내려 독립 시점에 0.3. 경계가 초기 고정 구간 안이면 5년째부터 내린다
       const tDrop = Math.max(FIX_YEARS, indep - (c.youngestChildAge ?? 0));
-      for (let t = tDrop; t < n; t++) S[t] = 0.3;
+      const start = Math.max(FIX_YEARS, tDrop - 6);
+      for (let t = start; t < n; t++) S[t] = Math.max(0.3, 1 - 0.1 * (t - start + 1));
       return S;
     }
     case "debt": {

@@ -93,17 +93,11 @@ describe("프리셋", () => {
     let s = reducer(initialState(), { type: "profile", patch: { childrenAges: [3, 6] } });
     s = reducer(s, { type: "preset", id: "child" });
     expect(s.presetId).toBe("child");
-    expect(deathSegments(s.blocks)).toEqual([
-      { fromAge: 40, toAge: 59, multiple: 1, kind: "death" },
-      { fromAge: 60, toAge: 109, multiple: 0.3, kind: "death" },
-    ]);
+    expect(levels(s).slice(13, 21)).toEqual([1, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3]);   // 표준: 20년 후(60세) 0.3, 그 6년 전부터 매년 0.1씩
     expect(presetContext(s.profile).youngestChildAge).toBe(5);
     s = reducer(s, { type: "applyInfo", applied: { child: true } });
     expect(s.infoApplied.child).toBe(true);
-    expect(deathSegments(s.blocks)).toEqual([
-      { fromAge: 40, toAge: 61, multiple: 1, kind: "death" },
-      { fromAge: 62, toAge: 109, multiple: 0.3, kind: "death" },
-    ]);
+    expect(levels(s).slice(15, 23)).toEqual([1, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3]);   // 막내 3세: 22년 후(62세) 0.3
     expect(presetContext(s.profile, undefined, s.infoApplied).youngestChildAge).toBe(3);
     s = reducer(s, { type: "applyInfo", applied: { child: false }, S0: 3e8, presetId: "level" });
     expect(s.S0).toBe(3e8); expect(s.presetId).toBe("level"); expect(s.infoApplied.child).toBe(false);
@@ -126,11 +120,11 @@ describe("프리셋", () => {
   it("축하금을 편집해도 프리셋(자녀연령형, 입력 반영)이 프로필 변경에 계속 반응한다", () => {
     let s = reducer(initialState(), { type: "profile", patch: { childrenAges: [] } });
     s = reducer(s, { type: "applyInfo", applied: { child: true }, presetId: "child" });
-    expect(deathSegments(s.blocks)[0].toAge).toBe(59);   // 자녀 정보가 없으면 표준 경계(20년 후)
+    expect(deathSegments(s.blocks)[0].toAge).toBe(53);   // 자녀 정보가 없으면 표준 경계(20년 후 0.3, 그 6년 전 54세부터 감액)
     s = reducer(s, { type: "addCelebration", age: 60 });
     s = reducer(s, { type: "profile", patch: { childrenAges: [1] } });
     expect(s.presetId).toBe("child");
-    expect(deathSegments(s.blocks)[0].toAge).toBe(63); // 40 + 24 - 1: 막내 1세 → t=24에서 하락
+    expect(deathSegments(s.blocks)[0].toAge).toBe(57); // 막내 1세 → t=24에 0.3, 그 6년 전(t=18, 58세)부터 감액
   });
 });
 
