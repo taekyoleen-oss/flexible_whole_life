@@ -1,7 +1,7 @@
 # 설계형 종신보험 설계 앱 — 개발 계획서
 
 - 작성: tkLeen · 2026-09
-- 상태: **v0.2 (인터뷰 반영, 엔진 명세 포함, 구현 착수 전)**
+- 상태: **v0.3 (엔진 완료 2026-09-10, UI 결정 반영, 단계 2 착수 전)**
 - 관련 문서: 『설계형 종신보험 검토 보고서』(PDF/HTML), 제안 슬라이드(PPTX)
 - 참조 구현: `Python_Web_like_Excel` 워크북(실제 산출과정표 위험률·산식·원본 정답값), `Life_Prem_Calc`(PremiaFlow, TS 엔진·골든 테스트 구조)
 
@@ -39,7 +39,7 @@
 
 | 항목 | 결정 | 이유 |
 |---|---|---|
-| 스택 | Next.js 15 App Router · React 19 · TypeScript strict · Tailwind v4 · shadcn/ui · Recharts · Zod · vitest | PremiaFlow와 동일 스택, 검증된 조합 |
+| 스택 | Next.js 15 App Router · React 19 · TypeScript strict · Tailwind v4 · Recharts · vitest (shadcn/ui·Zod는 v0.3에서 제외) | PremiaFlow와 같은 계열, 의존성 최소 |
 | 폴더 | 앱을 프로젝트 루트에 생성, 기존 문서 4개는 `docs/`로 이동. 엔진 `lib/engine/`, 데이터 `lib/engine/data/*.json`, 테스트 픽스처 `tests/fixtures/` | 사용자 프로젝트 관행 |
 | 계산 위치 | 전부 브라우저(클라이언트). 서버 컴포넌트는 라우팅만 | 110년 벡터 재계산은 수 ms |
 | 정밀도 | 내부 float64 무반올림, 최종 보험료·준비금·환급금만 원본 관행대로 반올림(§3.4.9) | 골든 1원 일치 |
@@ -52,6 +52,30 @@
 | 브랜드 | v0.1 §4 그대로(Sky Blue #4A90C2, Deep Navy #1B2845, Ink #0A0A0A, Cream #FAFAF7 / Fraunces·Pretendard·JetBrains Mono) | — |
 
 ---
+
+### 0.4 UI 인터뷰 결정 (2026-09-10, 객관식 4문항)
+
+| # | 항목 | 결정 |
+|---|---|---|
+| 13 | 구현 계획 분할 | 두 개. 단계 2(온보딩·설계 캔버스·프리셋·카드 편집·결과)를 먼저, 단계 3(추천·비교·인쇄·공유·설정)은 단계 2 완료 후 별도 계획 |
+| 14 | UI 라이브러리 | Recharts만 추가. 버튼·입력·카드는 Tailwind로 직접 작성. shadcn/ui·Zod는 설치하지 않음 |
+| 15 | 온보딩 형태 | 한 페이지 4섹션(피보험자·가족·재무·기존 보장). 필수 3개(성별·연령·예산)만 채우면 설계로 이동 |
+| 16 | UI 테스트 | 로직 단위 테스트(상태 리듀서·공유 직렬화·포맷)만 vitest. 화면은 `npm run build` 통과 + 수동 확인 |
+
+### 0.5 자체 결정 (UI)
+
+| 항목 | 결정 | 이유 |
+|---|---|---|
+| 상태 관리 | `lib/state.ts`에 `useReducer` + Context. 설계 상태 하나(`DesignState`)를 localStorage 키 `fwl:design:v1`에 자동 저장 | 화면 3개가 같은 상태를 공유, 외부 라이브러리 불필요 |
+| 재계산 | 디바운스 없이 `useMemo(compute)`. 110년 벡터 계산은 수 ms | 300ms 지연이 오히려 체감 느림 |
+| 입력 검증 | `<input type="number" min max step>` + 저장 시 clamp. Zod 미사용 | 필드 10여 개에 스키마 라이브러리는 과함 |
+| 폰트 | Pretendard(jsdelivr CDN CSS), Fraunces·JetBrains Mono(`next/font/google`) | Pretendard는 Google Fonts에 없음 |
+| 그래프 | 스케줄 = Recharts 계단형 라인(사망보험금 원) + 축하금 점 마커 + 초기 5년 음영. 결과 = 준비금·해약환급금·납입누계 라인 | 계획서 §3.7 |
+| 자동 수정 범위 | E01(변경 시점을 5년으로 이동)·E04·E05(배수 클램프)만 버튼으로 자동 수정. E02·E03·E06·E07·E08은 제안 문구만 | 나머지는 사용자 의도(예산·축하금)를 바꾸는 일이라 자동화 부적절 |
+| 근거 보기 | `<details>`로 10만원당 순·기준연납·영업보험료, 부가보험료 분해, N*·PVB 중간값 표 | §4 편의 원칙 6 |
+| 샘플 설계 3종 | 35세 남·자녀연령형(막내 2세, 월 20만) / 45세 여·부채상환형(부채 15년, 월 30만) / 55세 남·상속준비형(월 50만) | 시작 화면 진입점, 회귀 검사용 |
+| 반응형 | ≥1024px 3열 grid, 미만은 열을 탭으로 전환 | §4 |
+| 단계 2 라우트 | `/`, `/start`, `/design`. `/compare`·`/print`·`/s`·`/settings`는 단계 3 계획 | 결정 13 |
 
 ## 1. 목적과 범위
 
@@ -271,7 +295,7 @@ P^저   = P − ΔP,  G^저는 P^저로 3.4.4 재계산
 #### 3.4.10 구현 원칙
 
 - `lib/engine/`은 순수 TypeScript 모듈, UI·브라우저 API 의존 없음. `compute(input, assumptions) → Result` 한 진입점.
-- 입력은 Zod 스키마로 검증. 결과에는 입력 스냅샷·가정 세트 id·버전·envelope 통과 여부를 함께 담는다(감사추적).
+- 입력은 number input 범위 + clamp로 검증(v0.3). 결과에는 입력 스냅샷·가정 세트 id·버전·envelope 통과 여부를 함께 담는다(감사추적).
 - 계산 경로에 LLM·`eval` 사용 금지(PremiaFlow 원칙).
 
 ### 3.5 추천 로직 (니즈 + HLV)
@@ -311,7 +335,7 @@ P^저   = P − ΔP,  G^저는 P^저로 3.4.4 재계산
 | 화면 | 라우트 | 주요 요소 |
 |---|---|---|
 | 시작 | `/` | 마지막 설계 자동 복원 또는 온보딩 시작. 샘플 설계 3개 |
-| 온보딩 | `/start` | 4단계 위저드(피보험자 → 가족 → 재무 → 기존 보장). 각 단계 기본값만으로 다음 진행 가능 |
+| 온보딩 | `/start` | 한 페이지 4섹션(피보험자 → 가족 → 재무 → 기존 보장). 기본값만으로 설계 진행 가능 |
 | 설계 캔버스 | `/design` | **3열**: 입력 요약·예산 슬라이더 | 프리셋 선택·구간 카드·스케줄 그래프 | 보험료·환급금 곡선·검증 배지 |
 | 비교 | `/compare` | 3안 카드 + 지표 표 + 겹친 그래프 |
 | 인쇄 | `/print` | 제안서 레이아웃 |
@@ -322,7 +346,7 @@ P^저   = P − ΔP,  G^저는 P^저로 3.4.4 재계산
 
 **사용자 편의 원칙**
 
-1. 입력 변경 후 300ms 디바운스로 즉시 재계산. 저장 버튼 없음(localStorage 자동 저장).
+1. 입력 변경 즉시 재계산(`useMemo`). 저장 버튼 없음(localStorage 자동 저장).
 2. 기본값만으로 결과에 도달한다. 필수 입력은 성별·연령·예산 3개.
 3. envelope 위반은 해당 카드에 인라인으로 표시하고 "자동 수정" 버튼을 제공한다.
 4. 금액 입력은 만원 단위, 표시는 원 단위 천 단위 구분. 배수 ↔ 금액 토글.
@@ -337,8 +361,8 @@ P^저   = P − ΔP,  G^저는 P^저로 3.4.4 재계산
 
 | 계층 | 선택 |
 |---|---|
-| 프런트 | Next.js 15 App Router, React 19, TypeScript strict, Tailwind v4, shadcn/ui, Recharts |
-| 엔진 | `lib/engine` 순수 TS, Zod 입력 검증, vitest 골든 테스트 |
+| 프런트 | Next.js 15 App Router, React 19, TypeScript strict, Tailwind v4, Recharts |
+| 엔진 | `lib/engine` 순수 TS, vitest 골든 테스트 (완료 2026-09-10, G1~G5·envelope 39 테스트) |
 | 데이터 | 위험률·가정 세트 JSON을 저장소에 포함. 사용자 설정·설계는 localStorage |
 | 공유 | URL 해시 + `CompressionStream` (미지원 브라우저는 비압축 base64url) |
 | 문서 | 인쇄용 라우트 + `@media print` |
@@ -404,7 +428,7 @@ flexible_whole_life/
 ├─ lib/engine/     rates.ts commutation.ts premium.ts reserve.ts surrender.ts lowSurrender.ts
 │                  schedule.ts presets.ts envelope.ts needs.ts compare.ts index.ts
 │                  data/ rates-kli7.json assumptions.json
-├─ lib/            state.ts (zustand 없이 React state + localStorage) share.ts format.ts
+├─ lib/            state.ts (useReducer + Context + localStorage) samples.ts format.ts share.ts(단계 3)
 ├─ tests/          engine/*.test.ts fixtures/
 ├─ scripts/        extract-rates.mjs
 └─ docs/           계획서·보고서·슬라이드
@@ -417,7 +441,7 @@ flexible_whole_life/
 | 단계 | 기간(안) | 산출 | 완료 조건 |
 |---|---|---|---|
 | 0. 명세·데이터 | 2일 | 이 문서 v0.2, `rates-kli7.json`, 골든 픽스처 | 추출 JSON 행 수 113, 남 110·여 112에서 q=1 |
-| 1. 엔진 | 1주 | `lib/engine` 전 모듈 + vitest | G1~G5 통과, envelope 케이스 통과 |
+| 1. 엔진 | 완료(2026-09-10) | `lib/engine` 전 모듈 + vitest | G1~G5 통과, envelope 케이스 통과 ✔ |
 | 2. 설계 화면 | 1.5주 | 온보딩, 캔버스 3열, 프리셋, 카드 편집, 결과 | 기본값만으로 결과 도달, 위반 인라인 표시 |
 | 3. 제안 기능 | 1.5주 | 추천, 비교, 인쇄, 공유 링크, 설정 | 태블릿에서 상담 시나리오 완주, 모바일 공유 열람 |
 | 4. 2차 | — | 재설계, Excel, Supabase, 드래그 편집 | 별도 계획 |
