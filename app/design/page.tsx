@@ -12,7 +12,7 @@ import { ResultChart } from "@/components/result/result-chart";
 import { ValidationBadges } from "@/components/result/validation-badges";
 import { Button } from "@/components/ui";
 
-const TABS = ["입력", "설계", "결과"] as const;
+const TABS = ["입력", "설계"] as const;
 type Tab = (typeof TABS)[number];
 
 export default function DesignPage() {
@@ -25,10 +25,20 @@ export default function DesignPage() {
       <div className="mb-4 flex gap-2 lg:hidden">
         {TABS.map((t) => <Button key={t} primary={tab === t} aria-pressed={tab === t} onClick={() => setTab(t)}>{t}</Button>)}
       </div>
-      <div className="grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)_360px]">
-        {col("입력", <><InputSummary /><BudgetPanel /></>)}
-        {col("설계", <><PresetPicker /><ScheduleChart /><BlockCards /></>)}
-        {col("결과", <><PremiumSummary /><ValidationBadges /><ResultChart /><Evidence /></>)}
+      <div className="grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
+        {col("입력", <><BudgetPanel /><InputSummary /></>)}
+        {col("설계", (
+          <>
+            <PresetPicker />
+            <ScheduleChart />
+            <div className="grid gap-4 xl:grid-cols-2">
+              <div className="space-y-4"><PremiumSummary /><ValidationBadges /></div>
+              <ResultChart />
+            </div>
+            <BlockCards />
+            <Evidence />
+          </>
+        ))}
       </div>
     </>
   );

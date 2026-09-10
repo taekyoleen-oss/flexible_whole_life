@@ -44,14 +44,14 @@ export function BlockCards() {
       <h3 className="mt-4 text-sm font-medium text-navy">축하금 (생존급부)</h3>
       <ul className="mt-2 space-y-2">
         {cels.map((c, i) => (
-          <li key={i} className={`grid grid-cols-[1fr_1fr_auto] items-center gap-2 rounded border p-2 text-sm ${badCel.has(c.fromAge) ? "border-red-300 bg-red-50" : "border-navy/10"}`}>
+          <li key={i} className={`grid grid-cols-[auto_1fr_auto] items-center gap-2 rounded border p-2 text-sm ${badCel.has(c.fromAge) ? "border-red-300 bg-red-50" : "border-navy/10"}`}>
             <div className="flex items-center gap-1"><NumInput value={c.fromAge} min={age} max={endAge + 1} onCommit={(n) => dispatch({ type: "celebration", index: i, patch: { fromAge: n } })} /><span className="text-xs text-navy/60">세</span></div>
-            <div className="flex items-center gap-1"><NumInput value={c.multiple} min={0} max={10} step={0.05} onCommit={(n) => dispatch({ type: "celebration", index: i, patch: { multiple: n } })} /><span className="shrink-0 text-xs text-navy/60">배 = {won(c.multiple * state.S0)}</span></div>
+            <div className="text-xs text-navy/60">보험금의 10% = {won(c.multiple * state.S0)}</div>
             <Button onClick={() => dispatch({ type: "removeCelebration", index: i })}>삭제</Button>
           </li>
         ))}
       </ul>
-      <Button className="mt-2" onClick={() => dispatch({ type: "addCelebration", age: Math.min(age + 10, endAge), multiple: 0.1 })}>+ 축하금 추가</Button>
+      <Button className="mt-2" onClick={() => dispatch({ type: "addCelebration", age: Math.min(age + 10, endAge) })}>+ 축하금 추가</Button>
     </details>
   );
 }
