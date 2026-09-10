@@ -4,10 +4,11 @@ import { useState } from "react";
 import { useDesign } from "@/components/design-provider";
 import { Button } from "@/components/ui";
 import { autoName, downloadJson, exportJson, loadLibrary, saveLibrary, upsert } from "@/lib/library";
+import { downloadWorkbook } from "@/lib/excel";
 import { encodeShare } from "@/lib/share";
 
 export function DesignToolbar() {
-  const { state } = useDesign();
+  const { state, result } = useDesign();
   const [msg, setMsg] = useState("");
   const flash = (t: string) => { setMsg(t); setTimeout(() => setMsg(""), 2500); };
   const share = async () => {
@@ -30,6 +31,7 @@ export function DesignToolbar() {
     <div className="mb-4 flex flex-wrap items-center gap-2">
       <Button primary onClick={save}>보관함에 저장</Button>
       <Button onClick={exportFile}>JSON 내보내기</Button>
+      <Button onClick={() => downloadWorkbook(state, result, `검산_${autoName(state).replace(/[^\w가-힣]+/g, "_")}.xlsx`)}>Excel 검산</Button>
       <Button onClick={share}>공유 링크 복사</Button>
       <Link href="/compare" className={link}>같은 예산 3안 비교</Link>
       <Link href="/print" className={link}>제안서 인쇄</Link>
