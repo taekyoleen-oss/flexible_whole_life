@@ -60,5 +60,6 @@ function multiples(id: PresetId, c: PresetContext): number[] {
 }
 
 export function buildPreset(id: PresetId, c: PresetContext): Block[] {
-  return toBlocks(multiples(id, c), c.age);
+  // 배수는 소수 4자리로 정리한다(선형 램프의 부동소수 잡음이 카드 입력에 그대로 보이지 않게)
+  return toBlocks(multiples(id, c).map((x) => Math.round(x * 1e4) / 1e4), c.age);
 }
