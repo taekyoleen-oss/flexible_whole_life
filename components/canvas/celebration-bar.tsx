@@ -1,4 +1,5 @@
 "use client";
+import { FormulaHelp } from "@/components/formula-help";
 import { useState } from "react";
 import { useDesign } from "@/components/design-provider";
 import { Button, Input } from "@/components/ui";
@@ -17,7 +18,7 @@ export function CelebrationBar() {
   return (
     <div className="mt-3 space-y-2 text-sm">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-navy/70">축하금 (해당 연령 보험금의 {CELEBRATION_RATIO * 100}%)</span>
+        <span className="text-navy/70">축하금 (해당 연령 보험금의 {CELEBRATION_RATIO * 100}%) <FormulaHelp id="celebration" /></span>
         <div className="w-44">
           <Input value={text} placeholder="예: 55, 65" inputMode="numeric" onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && ages.length) add(); }} aria-label="축하금 받을 나이(쉼표로 구분)" />

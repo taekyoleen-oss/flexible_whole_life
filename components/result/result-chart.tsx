@@ -1,4 +1,5 @@
 "use client";
+import { FormulaHelp } from "@/components/formula-help";
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useDesign } from "@/components/design-provider";
 import { Card } from "@/components/ui";
@@ -25,7 +26,7 @@ export function ResultChart({ width }: { width?: number }) {
   );
   if (width) return chart;
   return (
-    <Card title="준비금 · 해약환급금">
+    <Card title={<>준비금 <FormulaHelp id="reserve" /> · 해약환급금 <FormulaHelp id="surrender" /></>}>
       <div className="h-64"><ResponsiveContainer width="100%" height="100%">{chart}</ResponsiveContainer></div>
     </Card>
   );

@@ -1,4 +1,5 @@
 "use client";
+import { FormulaHelp } from "@/components/formula-help";
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useDesign } from "@/components/design-provider";
 import { compareAtBudget, type CompareRow } from "@/lib/engine";
@@ -37,7 +38,7 @@ export function CompareTable({ chartWidth }: { chartWidth?: number }) {
   );
   return (
     <div className="space-y-4">
-      <p className="text-sm text-navy/70">같은 월 예산 <span className="font-mono">{won(budget)}</span>(표준형 기준)으로 세 안의 초기 보험금을 역산했습니다. 조합안의 정기보험 사업비는 종신과 같은 가정 세트를 씁니다.</p>
+      <p className="text-sm text-navy/70">같은 월 예산 <span className="font-mono">{won(budget)}</span>(표준형 기준)으로 세 안의 초기 보험금을 역산했습니다. 조합안의 정기보험 사업비는 종신과 같은 가정 세트를 씁니다. <FormulaHelp id="compare" /></p>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead><tr className="text-left text-navy/60"><th className="py-1">안</th>{cols.map(([h]) => <th key={h} className="py-1 text-right">{h}</th>)}</tr></thead>

@@ -1,4 +1,5 @@
 "use client";
+import { FormulaHelp } from "@/components/formula-help";
 import { Fragment } from "react";
 import { useDesign } from "@/components/design-provider";
 import { Button, Card } from "@/components/ui";
@@ -19,7 +20,7 @@ export function RecommendCard() {
     <Card title="추천 (니즈 · HLV)">
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <div className="text-xs text-navy/60">필요보장 (니즈 접근법)</div>
+          <div className="text-xs text-navy/60">필요보장 (니즈 접근법) <FormulaHelp id="needs" /> <FormulaHelp id="annuity" /></div>
           <div className="font-mono text-2xl text-navy">{won(r.needs.needs)}</div>
           <dl className="mt-2 grid grid-cols-[1fr_auto] gap-y-0.5 text-xs">
             {rows.map(([k, v]) => <Fragment key={k}><dt className="text-navy/60">{k}</dt><dd className="font-mono">{v}</dd></Fragment>)}
@@ -27,7 +28,7 @@ export function RecommendCard() {
           <Button className="mt-2" primary onClick={() => apply(r.suggestedS0)}>기준보험금 {won(r.suggestedS0)} 적용</Button>
         </div>
         <div>
-          <div className="text-xs text-navy/60">인적자본 (HLV, 은퇴까지 {r.needs.yearsToRetirement}년)</div>
+          <div className="text-xs text-navy/60">인적자본 (HLV, 은퇴까지 {r.needs.yearsToRetirement}년) <FormulaHelp id="hlv" /></div>
           <div className="font-mono text-2xl text-navy">{won(r.needs.hlv)}</div>
           <Button className="mt-2" onClick={() => apply(r.hlvS0)}>기준보험금 {won(r.hlvS0)} 적용</Button>
           <div className="mt-4 text-xs text-navy/60">추천 프리셋</div>

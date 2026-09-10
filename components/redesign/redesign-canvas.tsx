@@ -1,4 +1,6 @@
 "use client";
+import { FormulaHelp } from "@/components/formula-help";
+import type { FormulaId } from "@/lib/formulas";
 import { useRouter } from "next/navigation";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { CelebrationBar } from "@/components/canvas/celebration-bar";
@@ -23,6 +25,7 @@ export function RedesignCanvas({ old, budget, mode, lastRedesignedAt }: { old: O
   const loss = conversionLoss(old, state.settings);
   const rows = compareOptions(old, r, state.settings);
   const table: ReserveRow[] = r.reserve100k.map((v, t) => ({ t, age: old.attainedAge + t, benefit: (r.S[Math.min(t, r.n - 1)] ?? 0) * r.S0, celebration: (r.C[t] ?? 0) * r.S0, paid: r.paid[t], reserve: v * r.units, reserveStd: v * r.units, cash: r.cash[t], rate: r.rate[t] }));
+  const HELP: Partial<Record<string, FormulaId>> = { "재설계 시점 준비금": "redesignReserve", "전환 손실 (기초율 차이)": "loss" };
   const summary: [string, string][] = [
     [`월 보험료 (남은 ${budget.payYears}년)`, won(r.monthly.gross)],
     ["이월 금액", won(budget.carry)],
@@ -51,13 +54,13 @@ export function RedesignCanvas({ old, budget, mode, lastRedesignedAt }: { old: O
 
       <div className="grid gap-4 xl:grid-cols-2">
         <Card title="재설계 결과">
-          <div className="text-xs text-navy/60">새 기준보험금 (이월 {pct(r.fundedByCarry, 0)} + 보험료 {pct(1 - r.fundedByCarry, 0)})</div>
+          <div className="text-xs text-navy/60">새 기준보험금 (이월 {pct(r.fundedByCarry, 0)} + 보험료 {pct(1 - r.fundedByCarry, 0)}) <FormulaHelp id="redesignS0" /></div>
           <div className="font-mono text-3xl text-navy">{won(r.S0)}</div>
           <dl className="mt-2 grid grid-cols-[1fr_auto] gap-y-1 text-sm">
-            {summary.map(([k, v]) => <Fragment key={k}><dt className="text-navy/60">{k}</dt><dd className="font-mono">{v}</dd></Fragment>)}
+            {summary.map(([k, v]) => <Fragment key={k}><dt className="text-navy/60">{k}{HELP[k] && <FormulaHelp id={HELP[k]} className="ml-1" />}</dt><dd className="font-mono">{v}</dd></Fragment>)}
           </dl>
           <ul className="mt-3 space-y-1 text-sm">
-            {rules.map((x) => <li key={x.code} className={x.ok ? "text-emerald-800" : "text-red-800"}>{x.ok ? "✓" : "✗"} {x.code} · {x.message}</li>)}
+            {rules.map((x) => <li key={x.code} className={x.ok ? "text-emerald-800" : "text-red-800"}>{x.ok ? "✓" : "✗"} {x.code} · {x.message} <FormulaHelp id={x.code === "R01" ? "r01" : "r02r03"} /></li>)}
           </ul>
           <p className="mt-2 text-xs text-navy/50">신계약비 없음 · 해약공제 없음 · 현재 가정 {state.settings.assumption.label}</p>
         </Card>

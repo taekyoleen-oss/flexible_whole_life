@@ -11,7 +11,7 @@ export function Card({ title, children, className = "" }: { title?: ReactNode; c
   );
 }
 
-export function Field({ label, hint, children }: { label: string; hint?: ReactNode; children: ReactNode }) {
+export function Field({ label, hint, children }: { label: ReactNode; hint?: ReactNode; children: ReactNode }) {
   return (
     <label className="block text-sm">
       <span className="mb-1 block text-navy/80">{label}</span>

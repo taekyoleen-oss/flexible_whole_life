@@ -1,12 +1,15 @@
 "use client";
+import { FormulaHelp } from "@/components/formula-help";
+import type { FormulaId } from "@/lib/formulas";
 import { useDesign } from "@/components/design-provider";
 import { pct, won } from "@/lib/format";
 import { effective } from "@/lib/state";
 
 const YEARS = [1, 2, 3, 5, 10, 15, 20, 30];
 
+const HELP: Partial<Record<string, FormulaId>> = { "순보험료": "net", "기준연납순보험료": "base", "영업보험료": "gross", "급부 현가 PVB (radix 10만)": "pvb", "월납 보정 납입기수 N*": "nstar", "β′ 포함 연납순보험료 (1단위당)": "reserve" };
 const Table = ({ rows }: { rows: [string, string][] }) => (
-  <table className="w-full text-xs"><tbody>{rows.map(([a, b]) => <tr key={a} className="border-t border-navy/10"><td className="py-1 text-navy/70">{a}</td><td className="py-1 text-right font-mono">{b}</td></tr>)}</tbody></table>
+  <table className="w-full text-xs"><tbody>{rows.map(([a, b]) => <tr key={a} className="border-t border-navy/10"><td className="py-1 text-navy/70">{a}{HELP[a] && <FormulaHelp id={HELP[a]} className="ml-1" />}</td><td className="py-1 text-right font-mono">{b}</td></tr>)}</tbody></table>
 );
 
 export function Evidence() {
@@ -38,7 +41,7 @@ export function Evidence() {
       <summary className="cursor-pointer font-display text-lg text-navy">산출 근거</summary>
       <h3 className="mt-3 text-sm font-medium">10만원당 (월납 1회)</h3><Table rows={per100k} />
       <h3 className="mt-3 text-sm font-medium">중간값</h3><Table rows={mid} />
-      <h3 className="mt-3 text-sm font-medium">부가보험료 분해 (가입금액 {won(state.S0)} 기준, 1회 납입)</h3><Table rows={loading} />
+      <h3 className="mt-3 text-sm font-medium">부가보험료 분해 (가입금액 {won(state.S0)} 기준, 1회 납입) <FormulaHelp id="loading" /></h3><Table rows={loading} />
       <h3 className="mt-3 text-sm font-medium">해약환급금{eff.isLow ? ` (저해지: 납입기간 중 표준의 ${Math.round(eff.ratio * 100)}%)` : ""}</h3>
       <table className="w-full text-xs">
         <thead><tr className="text-navy/60"><th className="py-1 text-left">경과</th><th className="text-right">납입 누계</th><th className="text-right">환급금</th><th className="text-right">환급률</th></tr></thead>

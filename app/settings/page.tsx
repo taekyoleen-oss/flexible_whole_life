@@ -1,5 +1,7 @@
 "use client";
+import { FormulaHelp } from "@/components/formula-help";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { useDesign } from "@/components/design-provider";
 import { Button, Card, Field, NumInput, Select } from "@/components/ui";
 import { ASSUMPTIONS, compute, DEFAULT_ENVELOPE, getAssumption, type AssumptionSet, type EnvelopeParams } from "@/lib/engine";
@@ -7,7 +9,7 @@ import { won } from "@/lib/format";
 import { DEFAULT_SETTINGS, TABLE } from "@/lib/state";
 
 /** 소수(0.025) ↔ 퍼센트 입력(2.5) */
-const Pct = ({ label, value, onCommit, hint }: { label: string; value: number; onCommit: (v: number) => void; hint?: string }) => (
+const Pct = ({ label, value, onCommit, hint }: { label: ReactNode; value: number; onCommit: (v: number) => void; hint?: string }) => (
   <Field label={label} hint={hint}><div className="flex items-center gap-1"><NumInput value={Math.round(value * 1e4) / 100} step={0.05} min={0} max={100} onCommit={(v) => onCommit(v / 100)} /><span className="text-sm text-navy/60">%</span></div></Field>
 );
 
@@ -39,9 +41,9 @@ export default function SettingsPage() {
         </Field>
         <p className="mt-1 text-xs text-navy/60">현재: {a.label}{a.id === "custom" ? "" : ` (${a.version})`}</p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <Pct label="예정이율" value={a.interest} onCommit={(v) => setA({ interest: v })} />
+          <Pct label={<>예정이율 <FormulaHelp id="commutation" /></>} value={a.interest} onCommit={(v) => setA({ interest: v })} />
           <Pct label="표준이율 (표준 준비금)" value={a.standardInterest} onCommit={(v) => setA({ standardInterest: v })} />
-          <Pct label="저해지 환급금 비율 (납입기간 중)" value={a.lowSurrender.ratio} onCommit={(v) => setA({ lowSurrender: { ...a.lowSurrender, ratio: v } })} />
+          <Pct label={<>저해지 환급금 비율 (납입기간 중) <FormulaHelp id="lowSurrender" /></>} value={a.lowSurrender.ratio} onCommit={(v) => setA({ lowSurrender: { ...a.lowSurrender, ratio: v } })} />
           <Pct label="저해지 보험료 인하율" value={a.lowSurrender.premiumDiscount} onCommit={(v) => setA({ lowSurrender: { ...a.lowSurrender, premiumDiscount: v } })} />
         </div>
         <h3 className="mt-4 text-sm font-medium text-navy">사업비 ({a.expenses.model === "method" ? "산출방법서형" : "3이원 단순형"})</h3>

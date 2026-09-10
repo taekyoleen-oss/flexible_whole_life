@@ -29,6 +29,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
               <Link href="/print" className="text-sm text-navy/70 hover:text-navy">제안서</Link>
               <Link href="/redesign" className="text-sm text-navy/70 hover:text-navy">재설계</Link>
               <Link href="/settings" className="text-sm text-navy/70 hover:text-navy">설정</Link>
+              <Link href="/formulas" className="text-sm text-navy/70 hover:text-navy">수식</Link>
             </nav>
           </header>
           <main className="mx-auto max-w-[1536px] px-4 py-6">{children}</main>

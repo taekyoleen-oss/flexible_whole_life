@@ -1,4 +1,5 @@
 "use client";
+import { FormulaHelp } from "@/components/formula-help";
 import { useDesign } from "@/components/design-provider";
 import { Card, Field, ManwonInput, Select } from "@/components/ui";
 import { clamp, won } from "@/lib/format";
@@ -14,12 +15,12 @@ export function BudgetFields() {
   const setMonthly = (m: number) => dispatch({ type: "S0", S0: s0FromMonthly(m, eff.gross100k) });
   return (
     <div className="space-y-3">
-      <Field label="월 보험료" hint={<>초기 보험금 {won(result.S[0] * state.S0)} · 총 납입 {won(eff.totalPaid)}{eff.isLow && " (저해지)"}</>}>
+      <Field label={<>월 보험료 <FormulaHelp id="s0FromMonthly" /></>} hint={<>초기 보험금 {won(result.S[0] * state.S0)} · 총 납입 {won(eff.totalPaid)}{eff.isLow && " (저해지)"}</>}>
         <ManwonInput value={eff.monthly} onChange={setMonthly} min={MONTHLY_MIN} max={MONTHLY_MAX} />
       </Field>
       <input type="range" className="w-full accent-sky" min={MONTHLY_MIN} max={MONTHLY_MAX} step={1} aria-label="월 보험료 슬라이더"
         value={clamp(Math.round(eff.monthly / 1e4), MONTHLY_MIN, MONTHLY_MAX)} onChange={(e) => setMonthly(Number(e.target.value) * 1e4)} />
-      <Field label="기준보험금" hint={<>배수 1.0의 보험금. 1,000만원 단위 · 그래프 1칸(10%) = {won(state.S0 / 10)}</>}>
+      <Field label={<>기준보험금 <FormulaHelp id="step" /></>} hint={<>배수 1.0의 보험금. 1,000만원 단위 · 그래프 1칸(10%) = {won(state.S0 / 10)}</>}>
         <ManwonInput value={state.S0} onChange={(v) => dispatch({ type: "S0", S0: v })} min={1000} max={1e6} step={1000} />
       </Field>
     </div>
