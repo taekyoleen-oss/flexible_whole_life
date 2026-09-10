@@ -13,3 +13,12 @@
 body {
   font-family: var(--font-sans);
 }
+
+@media print {
+  @page { size: A4 portrait; margin: 14mm; }
+  header, .no-print { display: none !important; }
+  body { background: #fff; }
+  main { max-width: none; padding: 0; }
+  .print-page { break-after: page; }
+  .print-page:last-child { break-after: auto; }
+}
