@@ -10,3 +10,4 @@ export { PRESETS, buildPreset, FIX_YEARS, type PresetId, type PresetContext } fr
 export { validate, DEFAULT_ENVELOPE, type EnvelopeParams, type EnvelopeContext, type Violation } from "./envelope";
 export { needs, annuity, recommendPreset, type NeedsInput, type NeedsResult } from "./needs";
 export { compareAtBudget, type CompareRow, type CompareId } from "./compare";
+export { redesign, pvUnit, noAcquisition, type RedesignInput, type RedesignResult } from "./redesign";
