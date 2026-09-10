@@ -12,7 +12,7 @@ export const SAMPLES: Sample[] = [
     profile: { sex: "M", age: 55, childrenAges: [25, 28], income: 1e8, liquidAssets: 5e8 }, presetId: "estate" },
 ];
 
-/** 샘플 → 설계 상태. 월 예산에 맞춰 기준보험금을 역산한다(1만원 단위). */
+/** 샘플 → 설계 상태. 월 예산에 맞춰 기준보험금을 역산한다(1천만원 단위). */
 export function buildSample(s: Sample): DesignState {
   const base = initialState();
   const profile: Profile = { ...base.profile, ...s.profile };

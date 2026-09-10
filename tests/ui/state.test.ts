@@ -24,14 +24,15 @@ describe("프로필·예산", () => {
     expect(reducer(initialState(), { type: "profile", patch: { age: 5 } }).profile.age).toBe(15);
     expect(reducer(initialState(), { type: "profile", patch: { age: 99 } }).profile.age).toBe(70);
   });
-  it("S0는 100만~100억, 정수", () => {
-    expect(reducer(initialState(), { type: "S0", S0: 1234.6 }).S0).toBe(1e6);
+  it("S0는 1천만~100억, 1천만원 단위", () => {
+    expect(reducer(initialState(), { type: "S0", S0: 1234.6 }).S0).toBe(1e7);
     expect(reducer(initialState(), { type: "S0", S0: 5e10 }).S0).toBe(1e10);
-    expect(reducer(initialState(), { type: "S0", S0: 123456789.4 }).S0).toBe(123456789);
+    expect(reducer(initialState(), { type: "S0", S0: 123456789.4 }).S0).toBe(1.2e8);
+    expect(reducer(initialState(), { type: "S0", S0: 125e6 }).S0).toBe(1.3e8);   // 반올림
   });
   it("월 보험료 → 기준보험금 역산은 1만원 단위", () => {
     expect(s0FromMonthly(300000, 250)).toBe(1.2e8);     // 30만 × 10만 / 250
-    expect(s0FromMonthly(300000, 133)).toBe(225560000); // 225,563,909 → 만원 반올림
+    expect(s0FromMonthly(300000, 133)).toBe(2.3e8);     // 225,563,909 → 1천만원 반올림
     expect(s0FromMonthly(3e5, 0)).toBe(1e10);           // 0으로 나누면 상한 clamp
   });
   it("납입기간은 1~보험기간으로 clamp", () => {
@@ -72,7 +73,7 @@ describe("불러오기", () => {
     });
     expect(s.profile.age).toBe(70);
     expect(s.payYears).toBe(40); // 70세 남 종신 = 40년
-    expect(s.S0).toBe(1e6);
+    expect(s.S0).toBe(1e7);
     expect(deathSegments(s.blocks)).toEqual([{ fromAge: 70, toAge: 109, multiple: 1, kind: "death" }]);
     expect(s.presetId).toBe("level");
   });
@@ -289,6 +290,15 @@ describe("축하금 10% 규칙", () => {
     expect(celebrations(s.blocks)[0].multiple).toBe(0.25);
     s = reducer(s, { type: "celebration", index: 0, patch: { fromAge: 55 } });
     expect(celebrations(s.blocks)[0]).toMatchObject({ fromAge: 55, multiple: 0.21 });  // 45~59세 램프 중 55세(2.1배)의 10%
+  });
+  it("여러 나이에 각각 둘 수 있고, 같은 나이는 하나만 남으며, 하나를 지워도 나머지는 유지된다", () => {
+    let s = initialState();
+    for (const age of [65, 70, 75, 70]) s = reducer(s, { type: "addCelebration", age });
+    expect(celebrations(s.blocks).map((c) => c.fromAge)).toEqual([65, 70, 75]);
+    const r = evaluate(s);
+    expect([r.C[25], r.C[30], r.C[35]]).toEqual([0.1, 0.1, 0.1]);
+    s = reducer(s, { type: "removeCelebration", index: 1 });
+    expect(celebrations(s.blocks).map((c) => c.fromAge)).toEqual([65, 75]);
   });
   it("같은 나이에 두 번 추가하지 않는다", () => {
     let s = reducer(initialState(), { type: "addCelebration", age: 65 });

@@ -19,8 +19,8 @@ export function BudgetFields() {
       </Field>
       <input type="range" className="w-full accent-sky" min={MONTHLY_MIN} max={MONTHLY_MAX} step={1} aria-label="월 보험료 슬라이더"
         value={clamp(Math.round(eff.monthly / 1e4), MONTHLY_MIN, MONTHLY_MAX)} onChange={(e) => setMonthly(Number(e.target.value) * 1e4)} />
-      <Field label="기준보험금" hint="초기 고정 구간 배수 1.0에 해당하는 보험금">
-        <ManwonInput value={state.S0} onChange={(v) => dispatch({ type: "S0", S0: v })} min={100} max={1e6} />
+      <Field label="기준보험금" hint={<>배수 1.0의 보험금. 1,000만원 단위 · 그래프 1칸(10%) = {won(state.S0 / 10)}</>}>
+        <ManwonInput value={state.S0} onChange={(v) => dispatch({ type: "S0", S0: v })} min={1000} max={1e6} step={1000} />
       </Field>
     </div>
   );

@@ -4,14 +4,14 @@ import { buildSample, SAMPLES } from "@/lib/samples";
 import { ASSUMPTION_ID, TABLE, toEngineInput } from "@/lib/state";
 
 describe("샘플 설계 3종", () => {
-  it("월 예산 ±1% 안에서 기준보험금이 1만원 단위로 역산되고 envelope를 통과한다", () => {
+  it("월 예산 ±3% 안에서 기준보험금이 1천만원 단위로 역산되고 envelope를 통과한다", () => {
     expect(SAMPLES.map((s) => s.presetId)).toEqual(["child", "debt", "estate"]);
     for (const sample of SAMPLES) {
       const s = buildSample(sample);
-      expect(s.S0 % 1e4, sample.id).toBe(0);
+      expect(s.S0 % 1e7, sample.id).toBe(0);
       expect(s.updatedAt, sample.id).toBeGreaterThan(0);
       const r = compute(toEngineInput(s), getAssumption(ASSUMPTION_ID), TABLE);
-      expect(Math.abs(r.monthly.gross - sample.monthly) / sample.monthly, sample.id).toBeLessThan(0.01);
+      expect(Math.abs(r.monthly.gross - sample.monthly) / sample.monthly, sample.id).toBeLessThan(0.03);   // 1천만원 단위 반올림 오차
       const v = validate(r.S, r.C, { S0: s.S0, age: s.profile.age, n: r.n, payYears: s.payYears, freq: 12, grossUnit: r.perUnit.gross }, DEFAULT_ENVELOPE);
       expect(v, sample.id).toEqual([]);
     }

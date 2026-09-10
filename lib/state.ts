@@ -128,8 +128,12 @@ export function effective(r: EngineResult, payYears: number) {
   };
 }
 
-/** 월 보험료(원) → 기준보험금(원, 1만원 단위). gross100k = 10만원당 월 영업보험료(정수) */
-export const s0FromMonthly = (monthly: number, gross100k: number) => clamp(Math.round((monthly * 1e5) / gross100k / 1e4) * 1e4, 1e6, 1e10);
+/** 기준보험금 단위. 1천만원 단위로만 잡아야 그래프 1칸(10%)이 100만원 단위가 된다 */
+export const S0_UNIT = 1e7;
+export const S0_MIN = 1e7, S0_MAX = 1e10;
+export const roundS0 = (S0: number) => clamp(Math.round(S0 / S0_UNIT) * S0_UNIT, S0_MIN, S0_MAX);
+/** 월 보험료(원) → 기준보험금(원). 가장 가까운 1천만원 단위로 맞춘다 */
+export const s0FromMonthly = (monthly: number, gross100k: number) => roundS0((monthly * 1e5) / gross100k);
 
 export const deathSegments = (blocks: Block[]) => blocks.filter((b) => b.kind === "death").sort((a, b) => a.fromAge - b.fromAge);
 export const celebrations = (blocks: Block[]) => blocks.filter((b) => b.kind === "celebration").sort((a, b) => a.fromAge - b.fromAge);
@@ -210,7 +214,7 @@ export function reducer(s: DesignState, a: Action): DesignState {
       const blocks = Array.isArray(raw?.blocks) ? raw.blocks : [];
       const merged: DesignState = { ...DEFAULT_STATE, ...raw, profile };
       const payYears = clamp(Math.round(Number(merged.payYears)), 1, termOf(profile));
-      const S0 = clamp(Math.round(Number(merged.S0)), 1e6, 1e10);
+      const S0 = roundS0(Number(merged.S0));
       const anchors = cleanAnchors(merged.anchors, profile);
       return { ...withBlocks({ ...merged, payYears, S0, anchors }, deathSegments(blocks), celebrations(blocks)), updatedAt: merged.updatedAt };
     }
@@ -221,7 +225,7 @@ export function reducer(s: DesignState, a: Action): DesignState {
       const deaths = s.presetId === "custom" ? deathSegments(s.blocks) : buildPreset(s.presetId, presetContext(profile));
       return withBlocks(next, deaths, celebrations(s.blocks));
     }
-    case "S0": return touch({ S0: clamp(Math.round(a.S0), 1e6, 1e10) });
+    case "S0": return touch({ S0: roundS0(a.S0) });
     case "payYears": return touch({ payYears: clamp(Math.round(a.payYears), 1, termOf(s.profile)) });
     case "waiver": return touch({ waiver: a.on });
     case "lowSurrender": return touch({ lowSurrender: a.on });
