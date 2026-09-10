@@ -1,5 +1,5 @@
 import kli7 from "@/lib/engine/data/rates-kli7.json";
-import { buildPreset, DEFAULT_ENVELOPE, FIX_YEARS, type Block, type EngineInput, type PresetContext, type PresetId, type RateTable, type Sex } from "@/lib/engine";
+import { buildPreset, DEFAULT_ENVELOPE, type Block, type EngineInput, type PresetContext, type PresetId, type RateTable, type Sex } from "@/lib/engine";
 import { clamp } from "./format";
 
 export const TABLE = kli7 as RateTable;
@@ -60,7 +60,7 @@ export function toEngineInput(s: DesignState): EngineInput {
 }
 
 /** 월 보험료(원) → 기준보험금(원, 1만원 단위). gross100k = 10만원당 월 영업보험료(정수) */
-export const s0FromMonthly = (monthly: number, gross100k: number) => Math.max(1e4, Math.round((monthly * 1e5) / gross100k / 1e4) * 1e4);
+export const s0FromMonthly = (monthly: number, gross100k: number) => clamp(Math.round((monthly * 1e5) / gross100k / 1e4) * 1e4, 1e6, 1e10);
 
 export const deathSegments = (blocks: Block[]) => blocks.filter((b) => b.kind === "death").sort((a, b) => a.fromAge - b.fromAge);
 export const celebrations = (blocks: Block[]) => blocks.filter((b) => b.kind === "celebration").sort((a, b) => a.fromAge - b.fromAge);
@@ -120,7 +120,15 @@ export type Action =
 export function reducer(s: DesignState, a: Action): DesignState {
   const touch = (patch: Partial<DesignState>): DesignState => ({ ...s, ...patch, updatedAt: Date.now() });
   switch (a.type) {
-    case "load": return { ...a.state };
+    case "load": {
+      const raw = a.state as Partial<DesignState> | null | undefined;
+      const profile = clampProfile({ ...DEFAULT_PROFILE, ...raw?.profile });
+      const blocks = Array.isArray(raw?.blocks) ? raw.blocks : [];
+      const merged: DesignState = { ...DEFAULT_STATE, ...raw, profile };
+      const payYears = clamp(Math.round(Number(merged.payYears)), 1, termOf(profile));
+      const S0 = clamp(Math.round(Number(merged.S0)), 1e6, 1e10);
+      return { ...withBlocks({ ...merged, payYears, S0 }, deathSegments(blocks), celebrations(blocks)), updatedAt: merged.updatedAt };
+    }
     case "reset": return initialState();
     case "profile": {
       const profile = clampProfile({ ...s.profile, ...a.patch });
@@ -129,11 +137,12 @@ export function reducer(s: DesignState, a: Action): DesignState {
       return withBlocks(next, deaths, celebrations(s.blocks));
     }
     case "S0": return touch({ S0: clamp(Math.round(a.S0), 1e6, 1e10) });
-    case "payYears": return touch({ payYears: a.payYears });
+    case "payYears": return touch({ payYears: clamp(Math.round(a.payYears), 1, termOf(s.profile)) });
     case "waiver": return touch({ waiver: a.on });
     case "lowSurrender": return touch({ lowSurrender: a.on });
     case "preset": return withBlocks(s, buildPreset(a.id, presetContext(s.profile)), celebrations(s.blocks), a.id);
     case "segment": {
+      if (!deathSegments(s.blocks)[a.index]) return s;
       const d = deathSegments(s.blocks).map((b, i) => i !== a.index ? b : {
         ...b,
         toAge: a.patch.toAge === undefined ? b.toAge : Math.round(a.patch.toAge),
@@ -158,22 +167,23 @@ export function reducer(s: DesignState, a: Action): DesignState {
     }
     case "addCelebration": {
       const c: Block = { fromAge: Math.round(a.age), toAge: Math.round(a.age), multiple: clamp(a.multiple, 0, 10), kind: "celebration" };
-      return withBlocks(s, deathSegments(s.blocks), [...celebrations(s.blocks), c], "custom");
+      return withBlocks(s, deathSegments(s.blocks), [...celebrations(s.blocks), c]);
     }
     case "celebration": {
+      if (!celebrations(s.blocks)[a.index]) return s;
       const c = celebrations(s.blocks).map((b, i) => i !== a.index ? b : {
         ...b,
         fromAge: a.patch.fromAge === undefined ? b.fromAge : Math.round(a.patch.fromAge),
         multiple: a.patch.multiple === undefined ? b.multiple : clamp(a.patch.multiple, 0, 10),
       });
-      return withBlocks(s, deathSegments(s.blocks), c, "custom");
+      return withBlocks(s, deathSegments(s.blocks), c);
     }
     case "removeCelebration":
-      return withBlocks(s, deathSegments(s.blocks), celebrations(s.blocks).filter((_, i) => i !== a.index), "custom");
+      return withBlocks(s, deathSegments(s.blocks), celebrations(s.blocks).filter((_, i) => i !== a.index));
     case "autoFix": {
       const d = deathSegments(s.blocks);
       if (a.code === "E01") {
-        d[0] = { ...d[0], toAge: Math.max(d[0].toAge, s.profile.age + FIX_YEARS - 1) };
+        d[0] = { ...d[0], toAge: Math.max(d[0].toAge, s.profile.age + DEFAULT_ENVELOPE.fixYears - 1) };
       } else {
         const { minMultiple, maxMultiple } = DEFAULT_ENVELOPE;
         for (let i = 0; i < d.length; i++) d[i] = { ...d[i], multiple: clamp(d[i].multiple, minMultiple, maxMultiple) };
