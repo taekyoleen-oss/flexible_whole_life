@@ -9,6 +9,7 @@ import { ScheduleChart } from "@/components/canvas/schedule-chart";
 import { useDesign } from "@/components/design-provider";
 import { Evidence } from "@/components/result/evidence";
 import { PremiumSummary } from "@/components/result/premium-summary";
+import { ReserveTable } from "@/components/result/reserve-table";
 import { ResultChart } from "@/components/result/result-chart";
 import { ValidationBadges } from "@/components/result/validation-badges";
 import { Button } from "@/components/ui";
@@ -37,6 +38,7 @@ export default function DesignPage() {
               <div className="space-y-4"><PremiumSummary /><ValidationBadges /></div>
               <ResultChart />
             </div>
+            <ReserveTable />
             <BlockCards />
             <Evidence />
           </>

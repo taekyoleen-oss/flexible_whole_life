@@ -1,6 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useDesign } from "@/components/design-provider";
+import { LibraryPanel } from "@/components/library-panel";
 import { Button, Card } from "@/components/ui";
 import { won } from "@/lib/format";
 import { buildSample, SAMPLES } from "@/lib/samples";
@@ -20,6 +21,7 @@ export default function Home() {
           <Button primary={!hasSaved} onClick={() => { dispatch({ type: "reset" }); router.push("/start"); }}>새 설계 시작</Button>
         </div>
       </section>
+      <section className="max-w-3xl"><LibraryPanel /></section>
       <section>
         <h2 className="mb-3 font-display text-xl text-navy">샘플 설계</h2>
         <div className="grid gap-4 md:grid-cols-3">
