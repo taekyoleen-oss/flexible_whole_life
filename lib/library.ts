@@ -1,13 +1,16 @@
 import { PRESETS } from "@/lib/engine";
 import { won } from "./format";
 import { SHARE_VERSION, type SharePayload } from "./share";
+import type { BudgetMode, OldContract } from "./redesign";
 import { effective, evaluate, initialState, reducer, type DesignState } from "./state";
 
 /** 브라우저 보관함(localStorage). Supabase 없이 설계 여러 건을 이름으로 저장·전환한다 */
 export const LIBRARY_KEY = "fwl:designs:v1";
 export const LIBRARY_MAX = 50;
 
-export interface LibraryEntry { id: string; name: string; savedAt: number; state: DesignState }
+/** 재설계로 만든 항목은 원계약·예산을 함께 보관해 /redesign?id= 로 복원한다 */
+export interface RedesignMeta { old: OldContract; mode: BudgetMode; monthlyGross: number; redesignedAt: number }
+export interface LibraryEntry { id: string; name: string; savedAt: number; state: DesignState; redesign?: RedesignMeta }
 
 /** "45세 여 · 부채상환형 · 월 300,000원" 같은 기본 이름 */
 export function autoName(s: DesignState): string {
@@ -29,7 +32,7 @@ export function sanitizeLibrary(raw: unknown): LibraryEntry[] {
   const out: LibraryEntry[] = [];
   for (const e of raw as Partial<LibraryEntry>[]) {
     if (!e || typeof e !== "object" || typeof e.id !== "string" || typeof e.name !== "string" || !e.state) continue;
-    out.push({ id: e.id, name: e.name, savedAt: typeof e.savedAt === "number" ? e.savedAt : 0, state: reducer(initialState(), { type: "load", state: e.state as DesignState }) });
+    out.push({ id: e.id, name: e.name, savedAt: typeof e.savedAt === "number" ? e.savedAt : 0, state: reducer(initialState(), { type: "load", state: e.state as DesignState }), redesign: e.redesign && typeof e.redesign === "object" ? e.redesign : undefined });
   }
   return out.sort((a, b) => b.savedAt - a.savedAt).slice(0, LIBRARY_MAX);
 }

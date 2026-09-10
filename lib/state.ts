@@ -243,7 +243,7 @@ export type Action =
   | { type: "load"; state: DesignState }
   | { type: "reset" }
   | { type: "profile"; patch: Partial<Profile> }
-  | { type: "S0"; S0: number }
+  | { type: "S0"; S0: number; exact?: boolean }
   | { type: "payYears"; payYears: number }
   | { type: "waiver"; on: boolean }
   | { type: "lowSurrender"; on: boolean }
@@ -279,7 +279,7 @@ export function reducer(s: DesignState, a: Action): DesignState {
       const deaths = s.presetId === "custom" ? deathSegments(s.blocks) : buildPreset(s.presetId, presetContext(profile, envelopeOf(s)));
       return withBlocks(next, deaths, celebrations(s.blocks));
     }
-    case "S0": return touch({ S0: roundS0(a.S0) });
+    case "S0": return touch({ S0: a.exact ? clamp(Math.round(a.S0), 0, S0_MAX) : roundS0(a.S0) });   // exact: 재설계처럼 예산이 정한 값
     case "payYears": return touch({ payYears: clamp(Math.round(a.payYears), 1, termOf(s.profile)) });
     case "waiver": return touch({ waiver: a.on });
     case "lowSurrender": return touch({ lowSurrender: a.on });
