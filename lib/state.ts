@@ -1,5 +1,5 @@
 import kli7 from "@/lib/engine/data/rates-kli7.json";
-import { buildPreset, compute, DEFAULT_ENVELOPE, getAssumption, type Block, type EngineInput, type EngineResult, type PresetContext, type PresetId, type RateTable, type Sex } from "@/lib/engine";
+import { buildPreset, compute, DEFAULT_ENVELOPE, expandBlocks, getAssumption, toBlocks, type Block, type EngineInput, type EngineResult, type PresetContext, type PresetId, type RateTable, type Sex } from "@/lib/engine";
 import { clamp } from "./format";
 
 export const TABLE = kli7 as RateTable;
@@ -62,6 +62,43 @@ export function toEngineInput(s: DesignState): EngineInput {
 /** 현재 가정 세트·위험률표로 설계 상태를 산출한다 */
 export const evaluate = (s: DesignState): EngineResult => compute(toEngineInput(s), getAssumption(ASSUMPTION_ID), TABLE);
 
+export const STEP = 0.1;               // 그래프 1칸 = 기준보험금의 10%
+export const CELEBRATION_RATIO = 0.1;  // 축하금 = 해당 연령 사망보험금의 10%
+const r4 = (x: number) => Math.round(x * 1e4) / 1e4;
+
+/** 첫 편집 가능 연령 = 가입연령 + 초기 고정 연수(E01) */
+export const firstEditableAge = (p: Profile) => p.age + DEFAULT_ENVELOPE.fixYears;
+/** 연도별 사망보험금 배수 S_t (t = 0..n−1) */
+export const levels = (s: DesignState): number[] => expandBlocks(s.blocks, s.profile.age, termOf(s.profile)).S;
+/** 하한 배수: E05 감액 하한과 E06 최소 금액 중 큰 쪽 */
+export const floorMultiple = (S0: number) => Math.max(DEFAULT_ENVELOPE.minMultiple, DEFAULT_ENVELOPE.minAmount / S0);
+
+export interface AllowedRange { editable: boolean; prev: number; ref: number; steps: number; min: number; max: number }
+
+/**
+ * 연령 A에서 그래프로 움직일 수 있는 범위.
+ * 기준은 직전 연령(A−1)의 배수 prev이고, prev가 시작된 연령(ref, 최소 firstEditable)부터 A까지 지난 연수만큼 칸(STEP)을 쓸 수 있다.
+ * 급격한 증액을 막는 규칙이므로 프리셋이 만든 램프에는 적용하지 않고 수동 편집에만 쓴다.
+ */
+export function allowedRange(s: DesignState, ageAt: number): AllowedRange {
+  const x = s.profile.age, S = levels(s), first = firstEditableAge(s.profile), end = endAgeOf(s.profile);
+  const t = ageAt - x;
+  if (ageAt < first || ageAt > end) {
+    const prev = S[clamp(t, 0, S.length - 1)];
+    return { editable: false, prev, ref: ageAt, steps: 0, min: prev, max: prev };
+  }
+  const prev = S[t - 1];
+  let ref = ageAt - 1;
+  while (ref > x && S[ref - x - 1] === S[ref - x]) ref--;
+  ref = Math.max(ref, first);
+  const steps = ageAt - ref;
+  return {
+    editable: true, prev, ref, steps,
+    min: r4(Math.max(floorMultiple(s.S0), prev - steps * STEP)),
+    max: r4(Math.min(DEFAULT_ENVELOPE.maxMultiple, prev + steps * STEP)),
+  };
+}
+
 /** 고객이 실제로 내는 보험료 기준 요약. 저해지 ON이면 인하된 보험료·환급금을 쓴다. */
 export function effective(r: EngineResult, payYears: number) {
   const low = r.lowSurrender;
@@ -121,9 +158,17 @@ function clampProfile(p: Profile): Profile {
 }
 
 function withBlocks(s: DesignState, deaths: Block[], cels: Block[], presetId: DesignState["presetId"] = s.presetId): DesignState {
-  const p = s.profile;
+  const p = s.profile, n = termOf(p);
   const d = normalizeSegments(deaths, p.age, endAgeOf(p));
-  const c = cels.filter((b) => b.fromAge >= p.age && b.fromAge <= p.age + termOf(p)).map((b) => ({ ...b, toAge: b.fromAge }));
+  const { S } = expandBlocks(d, p.age, n);
+  const seen = new Set<number>();
+  const c: Block[] = [];
+  for (const b of cels) {
+    if (b.fromAge < p.age || b.fromAge > p.age + n || seen.has(b.fromAge)) continue;
+    seen.add(b.fromAge);
+    const t = Math.min(b.fromAge - p.age, n - 1);
+    c.push({ fromAge: b.fromAge, toAge: b.fromAge, multiple: r4(CELEBRATION_RATIO * S[t]), kind: "celebration" });
+  }
   return { ...s, blocks: [...d, ...c], presetId, updatedAt: Date.now() };
 }
 
@@ -141,9 +186,10 @@ export type Action =
   | { type: "segment"; index: number; patch: { toAge?: number; multiple?: number } }
   | { type: "splitSegment"; index: number }
   | { type: "removeSegment"; index: number }
-  | { type: "addCelebration"; age: number; multiple: number }
-  | { type: "celebration"; index: number; patch: { fromAge?: number; multiple?: number } }
+  | { type: "addCelebration"; age: number }
+  | { type: "celebration"; index: number; patch: { fromAge: number } }
   | { type: "removeCelebration"; index: number }
+  | { type: "level"; age: number; multiple: number }
   | { type: "autoFix"; code: AutoFixCode };
 
 export function reducer(s: DesignState, a: Action): DesignState {
@@ -195,20 +241,26 @@ export function reducer(s: DesignState, a: Action): DesignState {
       return withBlocks(s, d, celebrations(s.blocks), "custom");
     }
     case "addCelebration": {
-      const c: Block = { fromAge: Math.round(a.age), toAge: Math.round(a.age), multiple: clamp(a.multiple, 0, 10), kind: "celebration" };
+      const c: Block = { fromAge: Math.round(a.age), toAge: Math.round(a.age), multiple: 0, kind: "celebration" };
       return withBlocks(s, deathSegments(s.blocks), [...celebrations(s.blocks), c]);
     }
     case "celebration": {
       if (!celebrations(s.blocks)[a.index]) return s;
-      const c = celebrations(s.blocks).map((b, i) => i !== a.index ? b : {
-        ...b,
-        fromAge: a.patch.fromAge === undefined ? b.fromAge : Math.round(a.patch.fromAge),
-        multiple: a.patch.multiple === undefined ? b.multiple : clamp(a.patch.multiple, 0, 10),
-      });
+      const c = celebrations(s.blocks).map((b, i) => (i !== a.index ? b : { ...b, fromAge: Math.round(a.patch.fromAge) }));
       return withBlocks(s, deathSegments(s.blocks), c);
     }
     case "removeCelebration":
       return withBlocks(s, deathSegments(s.blocks), celebrations(s.blocks).filter((_, i) => i !== a.index));
+    case "level": {
+      const r = allowedRange(s, a.age);
+      if (!r.editable) return s;
+      const target = r4(clamp(a.multiple, r.min, r.max));
+      const S = levels(s), t = a.age - s.profile.age, delta = r4(target - S[t]);
+      if (delta === 0) return s;
+      const lo = floorMultiple(s.S0), hi = DEFAULT_ENVELOPE.maxMultiple;
+      const next = S.map((v, i) => (i >= t ? r4(clamp(v + delta, lo, hi)) : v));
+      return withBlocks(s, toBlocks(next, s.profile.age), celebrations(s.blocks), "custom");
+    }
     case "autoFix": {
       const d = deathSegments(s.blocks);
       if (a.code === "E01") {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_ENVELOPE, expandBlocks, validate } from "@/lib/engine";
-import { celebrations, deathSegments, effective, evaluate, initialState, presetContext, reducer, s0FromMonthly, termOf, toEngineInput, type DesignState } from "@/lib/state";
+import { CELEBRATION_RATIO, STEP, allowedRange, celebrations, deathSegments, effective, evaluate, firstEditableAge, floorMultiple, initialState, levels, presetContext, reducer, s0FromMonthly, termOf, toEngineInput, type DesignState } from "@/lib/state";
 
 describe("초기 상태", () => {
   const s = initialState();
@@ -104,17 +104,17 @@ describe("프리셋", () => {
     expect(presetContext(s.profile).debtYears).toBe(15);
   });
   it("프리셋 상태에서 프로필을 바꾸면 축하금은 유지된다", () => {
-    let s = reducer(initialState(), { type: "addCelebration", age: 65, multiple: 0.2 });
+    let s = reducer(initialState(), { type: "addCelebration", age: 65 });
     expect(s.presetId).toBe("level");
     s = reducer(s, { type: "profile", patch: { age: 45 } });
-    expect(celebrations(s.blocks)).toEqual([{ fromAge: 65, toAge: 65, multiple: 0.2, kind: "celebration" }]);
+    expect(celebrations(s.blocks)).toEqual([{ fromAge: 65, toAge: 65, multiple: 0.1, kind: "celebration" }]);
     const { C } = expandBlocks(s.blocks, 45, termOf(s.profile));
-    expect(C[20]).toBe(0.2);
+    expect(C[20]).toBe(0.1);
   });
   it("축하금을 편집해도 프리셋(자녀연령형)이 프로필 변경에 계속 반응한다", () => {
     let s = reducer(initialState(), { type: "profile", patch: { childrenAges: [] } });
     s = reducer(s, { type: "preset", id: "child" });
-    s = reducer(s, { type: "addCelebration", age: 60, multiple: 0.1 });
+    s = reducer(s, { type: "addCelebration", age: 60 });
     s = reducer(s, { type: "profile", patch: { childrenAges: [1] } });
     expect(s.presetId).toBe("child");
     expect(deathSegments(s.blocks)[0].toAge).toBe(63); // 40 + 24 - 1: 막내 1세 → t=24에서 하락
@@ -163,12 +163,12 @@ describe("구간 카드 편집", () => {
 
 describe("축하금", () => {
   it("추가·수정·삭제, 범위 밖이면 버린다", () => {
-    let s = reducer(initialState(), { type: "addCelebration", age: 65, multiple: 0.2 });
-    s = reducer(s, { type: "celebration", index: 0, patch: { multiple: 0.5, fromAge: 70 } });
-    expect(celebrations(s.blocks)).toEqual([{ fromAge: 70, toAge: 70, multiple: 0.5, kind: "celebration" }]);
+    let s = reducer(initialState(), { type: "addCelebration", age: 65 });
+    s = reducer(s, { type: "celebration", index: 0, patch: { fromAge: 70 } });
+    expect(celebrations(s.blocks)).toEqual([{ fromAge: 70, toAge: 70, multiple: 0.1, kind: "celebration" }]);
     s = reducer(s, { type: "celebration", index: 0, patch: { fromAge: 30 } });
     expect(celebrations(s.blocks)).toEqual([]);
-    s = reducer(s, { type: "addCelebration", age: 60, multiple: 0.1 });
+    s = reducer(s, { type: "addCelebration", age: 60 });
     s = reducer(s, { type: "removeCelebration", index: 0 });
     expect(celebrations(s.blocks)).toEqual([]);
   });
@@ -196,5 +196,70 @@ describe("자동 수정", () => {
     expect(codes(s)).toContain("E05");
     s = reducer(s, { type: "autoFix", code: "E05" });
     expect(seg(s)[1][2]).toBe(0.2);
+  });
+});
+
+describe("그래프 단계 편집 (level 액션)", () => {
+  const s0 = initialState(); // 40세 남 · 1억 · 평준 1.0
+  const S = (s: DesignState) => levels(s);
+  it("상수: 1칸 10%, 축하금 10%, 첫 편집 연령 45", () => {
+    expect(STEP).toBe(0.1); expect(CELEBRATION_RATIO).toBe(0.1);
+    expect(firstEditableAge(s0.profile)).toBe(45);
+  });
+  it("45세 이전은 편집 불가, 45세는 0칸, 50세는 45세부터 5칸", () => {
+    expect(allowedRange(s0, 44).editable).toBe(false);
+    expect(allowedRange(s0, 45)).toMatchObject({ editable: true, steps: 0, ref: 45, prev: 1, min: 1, max: 1 });
+    expect(allowedRange(s0, 50)).toMatchObject({ editable: true, steps: 5, ref: 45, prev: 1, min: 0.5, max: 1.5 });
+  });
+  it("50세를 1.7로 올리면 5칸 상한 1.5로 잘리고 50세 이후가 모두 1.5", () => {
+    const s = reducer(s0, { type: "level", age: 50, multiple: 1.7 });
+    expect(S(s)[9]).toBe(1); expect(S(s)[10]).toBe(1.5); expect(S(s)[69]).toBe(1.5);
+    expect(s.presetId).toBe("custom");
+  });
+  it("60세는 마지막 변경(50세)부터 10칸, E04 상한 3배", () => {
+    let s = reducer(s0, { type: "level", age: 50, multiple: 1.5 });
+    expect(allowedRange(s, 60)).toMatchObject({ steps: 10, ref: 50, prev: 1.5, min: 0.5, max: 2.5 });
+    s = reducer(s, { type: "level", age: 60, multiple: 9 });
+    expect(S(s)[20]).toBe(2.5);
+    s = reducer(s, { type: "level", age: 70, multiple: 9 });   // 10칸이면 3.5지만 상한 3
+    expect(S(s)[30]).toBe(3);
+    expect(allowedRange(s, 55)).toMatchObject({ steps: 5, ref: 50, prev: 1.5 });
+  });
+  it("앞 연령을 움직이면 뒤 구간은 같은 폭만큼 함께 움직인다", () => {
+    let s = reducer(s0, { type: "level", age: 50, multiple: 1.5 });
+    s = reducer(s, { type: "level", age: 60, multiple: 2.5 });
+    s = reducer(s, { type: "level", age: 50, multiple: 1.4 });
+    expect(S(s)[10]).toBe(1.4); expect(S(s)[20]).toBe(2.4);
+    s = reducer(s, { type: "level", age: 50, multiple: 0 });    // 5칸 아래 = 0.5, 뒤 구간도 −0.9
+    expect(S(s)[10]).toBe(0.5); expect(S(s)[20]).toBe(1.5);
+  });
+  it("하한은 E05 20%와 E06 1,000만원 중 큰 쪽", () => {
+    expect(floorMultiple(1e8)).toBe(0.2);
+    expect(floorMultiple(2e7)).toBe(0.5);
+    const small = reducer(s0, { type: "S0", S0: 2e7 });
+    expect(S(reducer(small, { type: "level", age: 50, multiple: 0 }))[10]).toBe(0.5);
+    let s = reducer(s0, { type: "level", age: 60, multiple: 0 });      // 15칸 아래 → 하한 0.2
+    expect(S(s)[20]).toBe(0.2);
+  });
+  it("편집 불가 연령·변화 없음은 같은 상태 참조를 돌려준다", () => {
+    expect(reducer(s0, { type: "level", age: 44, multiple: 2 })).toBe(s0);
+    expect(reducer(s0, { type: "level", age: 45, multiple: 1.3 })).toBe(s0);
+    expect(reducer(s0, { type: "level", age: 50, multiple: 1 })).toBe(s0);
+  });
+});
+
+describe("축하금 10% 규칙", () => {
+  it("해당 연령 사망보험금의 10%이고, 보험금이 바뀌면 따라간다", () => {
+    let s = reducer(initialState(), { type: "addCelebration", age: 65 });
+    expect(celebrations(s.blocks)).toEqual([{ fromAge: 65, toAge: 65, multiple: 0.1, kind: "celebration" }]);
+    s = reducer(s, { type: "level", age: 60, multiple: 2.5 });   // 45→60 15칸, 상한 2.5
+    expect(celebrations(s.blocks)[0].multiple).toBe(0.25);
+    s = reducer(s, { type: "celebration", index: 0, patch: { fromAge: 55 } });
+    expect(celebrations(s.blocks)[0]).toMatchObject({ fromAge: 55, multiple: 0.1 });
+  });
+  it("같은 나이에 두 번 추가하지 않는다", () => {
+    let s = reducer(initialState(), { type: "addCelebration", age: 65 });
+    s = reducer(s, { type: "addCelebration", age: 65 });
+    expect(celebrations(s.blocks)).toHaveLength(1);
   });
 });
