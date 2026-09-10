@@ -60,7 +60,7 @@ export function ScheduleEditor({ height, amount }: { height: number; amount: boo
     const { px, py } = pos(e);
     const age = ageAt(px);
     setSelected(age);
-    e.currentTarget.focus();
+    e.currentTarget.focus({ preventScroll: true });
     if (age < first) return;
     drag.current = age;
     e.currentTarget.setPointerCapture(e.pointerId);
