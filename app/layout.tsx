@@ -27,6 +27,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
               <Link href="/design" className="text-sm text-navy/70 hover:text-navy">설계</Link>
               <Link href="/compare" className="text-sm text-navy/70 hover:text-navy">비교</Link>
               <Link href="/print" className="text-sm text-navy/70 hover:text-navy">제안서</Link>
+              <Link href="/redesign" className="text-sm text-navy/70 hover:text-navy">재설계</Link>
               <Link href="/settings" className="text-sm text-navy/70 hover:text-navy">설정</Link>
             </nav>
           </header>

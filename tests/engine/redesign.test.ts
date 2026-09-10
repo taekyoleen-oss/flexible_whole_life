@@ -15,7 +15,7 @@ describe("redesign — 자기일관성", () => {
     const r = redesign({ sex: "M", attainedAge: 50, carry, monthlyGross: old.monthly.gross, payYears: 10, blocks: level(50, 109), waiver: false }, noExp, table);
     expect(r.S0 / 1e8).toBeCloseTo(1, 2);
     expect(Math.abs(r.monthly.gross - old.monthly.gross) / old.monthly.gross).toBeLessThan(1e-3);   // 10만원당 정수 반올림
-    expect(r.reserve100k[0] * r.units).toBeCloseTo(carry, -2);   // 시점 0 준비금 = 이월액
+    expect(Math.abs(r.reserve100k[0] * r.units - carry) / carry).toBeLessThan(1e-4);   // 시점 0 준비금 = 이월액 (10만원당 반올림)
     expect(r.cash[0]).toBe(r.reserve100k[0] * r.units);          // 해약공제 없음
   });
   it("납입 중단(감액완납): 이월액만으로 사는 보험금, 보험료 0", () => {

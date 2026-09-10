@@ -33,8 +33,8 @@ export function LibraryPanel() {
         <ul className="divide-y divide-navy/10 text-sm">
           {list.map((e) => (
             <li key={e.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
-              <div><div className="text-navy">{e.name}</div><div className="text-xs text-navy/50">{new Date(e.savedAt).toLocaleString("ko-KR")}</div></div>
-              <div className="flex gap-2"><Button primary onClick={() => open(e.state)}>열기</Button><Button onClick={() => del(e)}>삭제</Button></div>
+              <div><div className="text-navy">{e.redesign && <span className="mr-1 rounded bg-navy/10 px-1.5 py-0.5 text-xs">재설계</span>}{e.name}</div><div className="text-xs text-navy/50">{new Date(e.savedAt).toLocaleString("ko-KR")}</div></div>
+              <div className="flex gap-2"><Button primary onClick={() => (e.redesign ? router.push(`/redesign?id=${e.id}`) : open(e.state))}>열기</Button><Button onClick={() => del(e)}>삭제</Button></div>
             </li>
           ))}
         </ul>

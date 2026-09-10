@@ -33,6 +33,7 @@ export function DesignToolbar() {
       <Button onClick={share}>공유 링크 복사</Button>
       <Link href="/compare" className={link}>같은 예산 3안 비교</Link>
       <Link href="/print" className={link}>제안서 인쇄</Link>
+      <Link href="/redesign" className={link}>재설계</Link>
       <Link href="/settings" className={link}>설정</Link>
       {msg && <span className="text-xs text-emerald-700">{msg}</span>}
     </div>
