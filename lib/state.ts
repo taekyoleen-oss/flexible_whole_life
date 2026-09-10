@@ -62,6 +62,22 @@ export function toEngineInput(s: DesignState): EngineInput {
 /** 현재 가정 세트·위험률표로 설계 상태를 산출한다 */
 export const evaluate = (s: DesignState): EngineResult => compute(toEngineInput(s), getAssumption(ASSUMPTION_ID), TABLE);
 
+/** 고객이 실제로 내는 보험료 기준 요약. 저해지 ON이면 인하된 보험료·환급금을 쓴다. */
+export function effective(r: EngineResult, payYears: number) {
+  const low = r.lowSurrender;
+  const gross100k = low?.gross100k ?? r.per100k.gross;
+  const monthly = low?.monthlyGross ?? r.monthly.gross;
+  return {
+    isLow: low !== undefined,
+    gross100k,
+    monthly,
+    totalPaid: monthly * 12 * payYears, // 12 = 월납; 앱은 freq를 12로 고정한다
+    cash: low?.cash ?? r.surrender.cash,
+    rate: low?.rate ?? r.surrender.rate,
+    standardMonthly: r.monthly.gross,
+  };
+}
+
 /** 월 보험료(원) → 기준보험금(원, 1만원 단위). gross100k = 10만원당 월 영업보험료(정수) */
 export const s0FromMonthly = (monthly: number, gross100k: number) => clamp(Math.round((monthly * 1e5) / gross100k / 1e4) * 1e4, 1e6, 1e10);
 

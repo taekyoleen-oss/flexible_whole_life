@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_ENVELOPE, expandBlocks, validate } from "@/lib/engine";
-import { celebrations, deathSegments, initialState, presetContext, reducer, s0FromMonthly, termOf, toEngineInput, type DesignState } from "@/lib/state";
+import { celebrations, deathSegments, effective, evaluate, initialState, presetContext, reducer, s0FromMonthly, termOf, toEngineInput, type DesignState } from "@/lib/state";
 
 describe("초기 상태", () => {
   const s = initialState();
@@ -40,6 +40,25 @@ describe("프로필·예산", () => {
   });
   it("나이가 NaN이면 clamp 하한(15)로 떨어지고 예외를 던지지 않는다", () => {
     expect(reducer(initialState(), { type: "profile", patch: { age: NaN } }).profile.age).toBe(15);
+  });
+});
+
+describe("effective (고객 실납입 기준 요약)", () => {
+  it("저해지 OFF면 표준 보험료를 그대로 쓴다", () => {
+    const s0 = initialState();
+    const r0 = evaluate(s0);
+    const eff = effective(r0, s0.payYears);
+    expect(eff.isLow).toBe(false);
+    expect(eff.monthly).toBe(r0.monthly.gross);
+    expect(eff.totalPaid).toBe(r0.totalPaid);
+  });
+  it("저해지 ON이면 인하된 보험료를 쓴다", () => {
+    const s = reducer(initialState(), { type: "lowSurrender", on: true });
+    const r = evaluate(s);
+    const eff = effective(r, s.payYears);
+    expect(eff.isLow).toBe(true);
+    expect(eff.monthly).toBe(r.lowSurrender!.monthlyGross);
+    expect(eff.monthly).toBeLessThan(r.monthly.gross);
   });
 });
 
