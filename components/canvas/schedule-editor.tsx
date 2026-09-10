@@ -76,6 +76,8 @@ export function ScheduleEditor({ height, amount, readOnly = false }: { height: n
     drag.current = null;
     if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
   };
+  /** 더블클릭: 그 연령의 값으로 이후를 평탄하게 */
+  const onDouble = (e: PointerEvent<SVGSVGElement>) => { const age = ageAt(pos(e).px); if (age >= first) dispatch({ type: "flatten", age }); };
   const onKey = (e: KeyboardEvent<SVGSVGElement>) => {
     if (e.key === "Escape") { setSelected(null); return; }
     if (selected === null) return;
@@ -100,7 +102,7 @@ export function ScheduleEditor({ height, amount, readOnly = false }: { height: n
         className="block touch-none rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-sky"
         style={{ cursor: !readOnly && focus !== null && focus >= first ? "ns-resize" : "default" }}
         onPointerDown={readOnly ? undefined : onDown} onPointerMove={readOnly ? undefined : onMove} onPointerUp={readOnly ? undefined : onUp} onPointerCancel={readOnly ? undefined : onUp}
-        onPointerLeave={readOnly ? undefined : () => setHover(null)} onKeyDown={readOnly ? undefined : onKey}>
+        onPointerLeave={readOnly ? undefined : () => setHover(null)} onKeyDown={readOnly ? undefined : onKey} onDoubleClick={readOnly ? undefined : onDouble}>
         <rect x={xs(x0)} y={M.top} width={xs(first) - xs(x0)} height={ph} fill="#4a90c2" fillOpacity={0.1} />
         {gridLevels.map((m) => (
           <line key={m} x1={M.left} x2={W - M.right} y1={ys(m)} y2={ys(m)} stroke="#1b2845" strokeOpacity={Math.round(m * 10) % 5 === 0 ? 0.15 : 0.05} />
@@ -137,7 +139,7 @@ export function ScheduleEditor({ height, amount, readOnly = false }: { height: n
             <circle cx={xs(focus)} cy={ys(at(focus))} r={5} fill="#fff" stroke="#4a90c2" strokeWidth={2} />
             <text x={Math.min(xs(focus) + 8, W - 190)} y={Math.max(M.top + 30, ys(at(focus)) - 10)} fontSize={12} fontWeight={600} fill="#1b2845" {...halo}>{focus}세 {label(at(focus))}</text>
             <text x={Math.min(xs(focus) + 8, W - 190)} y={Math.max(M.top + 44, ys(at(focus)) + 4)} fontSize={11} fill={range.editable ? "#1b2845" : "#b91c1c"} {...halo}>
-              {range.editable ? `${range.ref}세 변경점부터 ${range.steps}년 → ±${range.steps}칸` : "고정 구간 (편집 불가)"}
+              {range.editable ? `${range.ref}세부터 ${range.steps}년 → ↑${range.steps}칸 · ↓${range.min}배까지` : "고정 구간 (편집 불가)"}
             </text>
           </g>
         )}

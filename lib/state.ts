@@ -145,9 +145,9 @@ export const cleanAnchors = (anchors: unknown, p: Profile, env: EnvelopeParams =
 
 /**
  * 연령 A에서 그래프로 움직일 수 있는 범위.
- * 기준(ref)은 A보다 앞선 마지막 변경점(없으면 첫 편집 연령 45세), prev는 지금 A의 배수(드래그 시작 값).
- * 칸 수 = A − ref. 프리셋 모양은 그대로 두고 그 위에 변화폭을 더한다: 올리거나 내린 k칸은 A 직전 k년(A−k … A−1)에
- * 매년 한 칸씩 더해지고 A부터는 같은 폭(Δ)이 더해진다. 예: 평준형 40세 가입, 50세를 3칸 올리면 47·48·49세가 1.1·1.2·1.3배, 50세부터 1.3배.
+ * 기준(ref)은 A보다 앞선 마지막 변경점(없으면 첫 편집 연령 45세), prev는 지금 A의 배수(드래그 시작 값), 칸 수 = A − ref.
+ * 올리기는 칸 수만큼(매년 한 칸, E02 증가율 제한), 내리기는 증가율 제한이 없으므로 하한(E05 20%·E06 1천만원)까지.
+ * A 이후는 기존 모양 위에 같은 폭(Δ)을 더하고, A 직전 구간은 ref 이후 연도에 고르게 나눠 A−1에서 새 값에 닿는다(level 액션).
  */
 export function allowedRange(s: DesignState, ageAt: number, base?: LevelBase): AllowedRange {
   const x = s.profile.age, S = base?.S ?? levels(s), anchors = base?.anchors ?? s.anchors;
@@ -163,9 +163,25 @@ export function allowedRange(s: DesignState, ageAt: number, base?: LevelBase): A
   const steps = ageAt - ref;
   return {
     editable: true, prev, ref, steps,
-    min: r4(Math.max(floorMultiple(s.S0, env), prev - steps * STEP)),
+    min: steps === 0 ? prev : r4(Math.min(prev, floorMultiple(s.S0, env))),
     max: r4(Math.min(env.maxMultiple, prev + steps * STEP)),
   };
+}
+
+/**
+ * 변경점 정리: 직전 변경점(없으면 첫 편집 연령 직전 해) 이후 A까지 값이 한 번도 바뀌지 않으면 그 변경점은 직선 위에 있으므로 지운다.
+ * 그래프에서 되돌리거나 평탄화해 직선이 되면 마름모가 사라진다.
+ */
+export function pruneAnchors(S: number[], anchors: number[], x: number, first: number): number[] {
+  const out: number[] = [];
+  let from = first - x;   // 비교 시작 인덱스(이 해와 그 전해부터 비교)
+  for (const a of anchors) {
+    const t = a - x;
+    let changed = false;
+    for (let i = from; i <= t && i < S.length; i++) if (i > 0 && S[i] !== S[i - 1]) { changed = true; break; }
+    if (changed) { out.push(a); from = t + 1; }
+  }
+  return out;
 }
 
 /** 고객이 실제로 내는 보험료 기준 요약. 저해지 ON이면 인하된 보험료·환급금을 쓴다. */
@@ -265,6 +281,7 @@ export type Action =
   | { type: "celebration"; index: number; patch: { fromAge: number } }
   | { type: "removeCelebration"; index: number }
   | { type: "level"; age: number; multiple: number; base?: LevelBase }
+  | { type: "flatten"; age: number }   // 더블클릭: A 이후를 A의 값으로 평탄화
   | { type: "settings"; patch: Partial<Settings> }
   | { type: "applyInfo"; applied: Partial<InfoApplied>; S0?: number; presetId?: PresetId }
   | { type: "resetDesign" }
@@ -363,21 +380,32 @@ export function reducer(s: DesignState, a: Action): DesignState {
       const S = a.base && a.base.S.length === n ? a.base.S : levels(s);
       const anchors0 = a.base?.anchors ?? s.anchors;
       const target = r4(clamp(a.multiple, r.min, r.max));
-      const t = a.age - x;
-      // 기존 모양(프리셋·이전 편집)은 그대로 두고 변화폭 Δ = target − 지금 A의 값을 더한다
+      const t = a.age - x, tRef = r.ref - x;
+      // A 이후: 기존 모양(프리셋·이전 편집) 위에 변화폭 Δ = target − 지금 A의 값을 더한다
       const delta = r4(target - S[t]);
       const lo = floorMultiple(s.S0, envelopeOf(s)), hi = envelopeOf(s).maxMultiple;
       const next = S.slice();
-      // A 직전 k년: 매년 한 칸씩 Δ까지 계단식으로 더한다(칸 수 제한으로 k ≤ A − ref)
-      const k = Math.ceil(Math.abs(delta) / STEP - 1e-9), sign = Math.sign(delta);
-      for (let j = 0; j < k; j++) next[t - k + j] = r4(clamp(S[t - k + j] + sign * Math.min(STEP * (j + 1), Math.abs(delta)), lo, hi));
-      // A 이후: 같은 폭만큼 함께 이동, 상·하한에서 정지
       for (let i = t; i < n; i++) next[i] = r4(clamp(S[i] + delta, lo, hi));
+      // A 직전: 한 칸(10%)에 1년씩, 연도가 모자라면(내릴 때) ref 이후 연도 전부에 고르게 나눠 A−1에서 target에 닿는다
+      const k = Math.min(Math.ceil(Math.abs(delta) / STEP - 1e-9), t - tRef);
+      const r0 = t - k, from = S[r0 - 1];
+      for (let i = r0; i < t; i++) next[i] = r4(clamp(from + ((target - from) * (i - r0 + 1)) / k, lo, hi));
       const unchangedFromBase = next.every((v, i) => v === S[i]);
-      const anchors = unchangedFromBase ? anchors0 : cleanAnchors([...anchors0, a.age], s.profile, envelopeOf(s));
+      const first = firstEditableAge(s.profile, envelopeOf(s));
+      const anchors = pruneAnchors(next, unchangedFromBase ? anchors0 : cleanAnchors([...anchors0, a.age], s.profile, envelopeOf(s)), x, first);
       const cur = levels(s);
       const same = next.every((v, i) => v === cur[i]) && anchors.length === s.anchors.length && anchors.every((v, i) => v === s.anchors[i]);
       if (same) return s;
+      return withBlocks({ ...s, anchors }, toBlocks(next, x), celebrations(s.blocks), "custom");
+    }
+    case "flatten": {
+      const r = allowedRange(s, a.age);
+      if (!r.editable) return s;
+      const x = s.profile.age, n = termOf(s.profile), S = levels(s), t = a.age - x;
+      const next = S.slice();
+      for (let i = t; i < n; i++) next[i] = S[t];
+      if (next.every((v, i) => v === S[i])) return s;
+      const anchors = pruneAnchors(next, cleanAnchors([...s.anchors.filter((b) => b <= a.age), a.age], s.profile, envelopeOf(s)), x, firstEditableAge(s.profile, envelopeOf(s)));
       return withBlocks({ ...s, anchors }, toBlocks(next, x), celebrations(s.blocks), "custom");
     }
     case "autoFix": {

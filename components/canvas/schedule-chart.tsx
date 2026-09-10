@@ -27,7 +27,7 @@ export function ScheduleChart() {
   return (
     <Card title="보험금 스케줄">
       <div className="-mt-2 mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-navy/60">
-        <span>연령을 클릭한 뒤 위아래로 드래그 · 1칸 = 기준보험금의 {STEP * 100}% ({won(STEP * state.S0)}) · 마지막 변경 후 지난 연수만큼 이동 가능 <FormulaHelp id="step" /></span>
+        <span>연령을 클릭한 뒤 위아래로 드래그 · 1칸 = 기준보험금의 {STEP * 100}% ({won(STEP * state.S0)}) · 올리기는 마지막 변경 후 지난 연수만큼, 내리기는 하한까지 · 더블클릭하면 그 값으로 이후를 평탄화 <FormulaHelp id="step" /></span>
         <span className="flex gap-2">{toggle}<Button onClick={() => dlg.current?.showModal()}>확대</Button></span>
       </div>
       <ScheduleEditor height={400} amount={amount} />

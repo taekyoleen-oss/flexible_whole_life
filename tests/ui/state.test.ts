@@ -219,7 +219,7 @@ describe("그래프 단계 편집 (level 액션)", () => {
   it("45세 이전은 편집 불가, 45세는 0칸, 50세는 45세부터 5칸", () => {
     expect(allowedRange(s0, 44).editable).toBe(false);
     expect(allowedRange(s0, 45)).toMatchObject({ editable: true, steps: 0, ref: 45, prev: 1, min: 1, max: 1 });
-    expect(allowedRange(s0, 50)).toMatchObject({ editable: true, steps: 5, ref: 45, prev: 1, min: 0.5, max: 1.5 });
+    expect(allowedRange(s0, 50)).toMatchObject({ editable: true, steps: 5, ref: 45, prev: 1, min: 0.2, max: 1.5 });   // 내리기는 하한까지
   });
   it("50세를 1.7로 올리면 5칸 상한 1.5로 잘리고, 45~49세가 매년 한 칸씩 오르며, 50세 이후는 1.5", () => {
     const s = reducer(s0, { type: "level", age: 50, multiple: 1.7 });
@@ -237,7 +237,7 @@ describe("그래프 단계 편집 (level 액션)", () => {
   });
   it("60세는 마지막 변경점(50세)부터 10칸, E04 상한 3배", () => {
     let s = reducer(s0, { type: "level", age: 50, multiple: 1.5 });
-    expect(allowedRange(s, 60)).toMatchObject({ steps: 10, ref: 50, prev: 1.5, min: 0.5, max: 2.5 });
+    expect(allowedRange(s, 60)).toMatchObject({ steps: 10, ref: 50, prev: 1.5, min: 0.2, max: 2.5 });
     s = reducer(s, { type: "level", age: 60, multiple: 9 });
     expect(S(s).slice(10, 21)).toEqual([1.6, 1.7, 1.8, 1.9, 2, 2.1, 2.2, 2.3, 2.4, 2.5, 2.5]);   // 50~59세 램프, 60세부터 2.5
     s = reducer(s, { type: "level", age: 70, multiple: 9 });   // 10칸이면 3.5지만 상한 3
@@ -248,14 +248,36 @@ describe("그래프 단계 편집 (level 액션)", () => {
   it("변경점을 다시 움직이면 지금 값 기준 ±칸 수이고, 기존 모양 위에 변화폭이 더해져 뒤 구간도 함께 움직인다", () => {
     let s = reducer(s0, { type: "level", age: 50, multiple: 1.5 });
     s = reducer(s, { type: "level", age: 60, multiple: 2.5 });
-    expect(allowedRange(s, 50)).toMatchObject({ ref: 45, prev: 1.6, steps: 5, min: 1.1, max: 2.1 });   // 50세는 60세를 향한 램프의 첫 해(1.6)
-    s = reducer(s, { type: "level", age: 50, multiple: 1.5 });   // Δ = −0.1: 49세에만 −0.1, 50세부터 −0.1
-    expect(S(s).slice(5, 11)).toEqual([1.1, 1.2, 1.3, 1.4, 1.4, 1.5]);
+    expect(allowedRange(s, 50)).toMatchObject({ ref: 45, prev: 1.6, steps: 5, min: 0.2, max: 2.1 });   // 50세는 60세를 향한 램프의 첫 해(1.6)
+    s = reducer(s, { type: "level", age: 50, multiple: 1.5 });   // Δ = −0.1: 49세는 48세 값(1.4)에서 1.5로, 50세부터 −0.1
+    expect(S(s).slice(5, 11)).toEqual([1.1, 1.2, 1.3, 1.4, 1.5, 1.5]);
     expect(S(s)[20]).toBe(2.4);   // 60세 변경점은 같은 폭(−0.1)만큼 이동
-    s = reducer(s, { type: "level", age: 50, multiple: 0 });    // 하한 1.5 − 5칸 = 1.0: 45~49세에 −0.1…−0.5, 뒤 구간 −0.5
-    expect(S(s).slice(5, 11)).toEqual([1, 1, 1, 1, 0.9, 1]);
-    expect(S(s)[20]).toBe(1.9);
+    s = reducer(s, { type: "level", age: 50, multiple: 0 });    // 하한 0.2까지: 45~49세는 1.0에서 0.2까지 고르게, 뒤 구간 −1.3
+    expect(S(s).slice(5, 11)).toEqual([0.84, 0.68, 0.52, 0.36, 0.2, 0.2]);
+    expect(S(s)[20]).toBe(1.1);
     expect(s.anchors).toEqual([50, 60]);
+  });
+  it("내리기는 하한까지, 직전 변경점 이후 연도에 고르게: 은퇴증액형 70세를 0.5로", () => {
+    const r = reducer(s0, { type: "preset", id: "retire" });   // 62·63세 램프, 64세부터 1.5
+    const s = reducer(r, { type: "level", age: 70, multiple: 0.5 });
+    expect(S(s).slice(19, 31).map((v) => Math.round(v * 100) / 100)).toEqual([1, 0.95, 0.9, 0.85, 0.8, 0.75, 0.7, 0.65, 0.6, 0.55, 0.5, 0.5]);   // 60~69세 고르게, 70세부터 0.5
+    expect(S(s)[69]).toBe(0.5);
+  });
+  it("더블클릭 평탄화: 이후를 그 연령 값으로, 직선이 되면 변경점을 지운다", () => {
+    let s = reducer(s0, { type: "level", age: 50, multiple: 1.5 });
+    s = reducer(s, { type: "level", age: 60, multiple: 2.5 });
+    s = reducer(s, { type: "flatten", age: 55 });   // 55세 값 2.1로 이후 평탄화 → 60세 변경점은 직선 위이므로 삭제
+    expect(S(s).slice(14, 22)).toEqual([2, 2.1, 2.1, 2.1, 2.1, 2.1, 2.1, 2.1]);
+    expect(s.anchors).toEqual([50, 55]);
+    s = reducer(s, { type: "flatten", age: 45 });   // 45세 값 1.1로 평탄화 → 45세부터 직선, 50·55 변경점 삭제(45세는 기본 기준이라 변경점으로 두지 않음)
+    expect(S(s).slice(4, 8)).toEqual([1, 1.1, 1.1, 1.1]);
+    expect(s.anchors).toEqual([]);
+    // 새 드래그로 되돌려 완전한 직선이 되면 마름모가 사라진다
+    let d = reducer(s0, { type: "level", age: 50, multiple: 1.3 });
+    expect(d.anchors).toEqual([50]);
+    d = reducer(d, { type: "level", age: 50, multiple: 1.0 });
+    expect(S(d)).toEqual(levels(s0)); expect(d.anchors).toEqual([]);
+    expect(reducer(s0, { type: "flatten", age: 44 })).toBe(s0);   // 고정 구간은 무시
   });
   it("프리셋 모양은 유지된 채 편집된다: 자녀연령형 65세 +3칸", () => {
     const c = reducer(s0, { type: "preset", id: "child" });   // 표준: 54~60세 0.9→0.3
