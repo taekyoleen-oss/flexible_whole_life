@@ -1,6 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { BudgetFields, ContractFields } from "@/components/canvas/budget-panel";
+import { RecommendCard } from "@/components/canvas/recommend-card";
 import { useDesign } from "@/components/design-provider";
 import { Button, Card, Field, Input, ManwonInput, NumInput, Select } from "@/components/ui";
 import type { Profile } from "@/lib/state";
@@ -56,6 +57,8 @@ export default function StartPage() {
           <Field label="정기보험 만기 나이"><NumInput value={p.termCoverEndAge} min={20} max={100} onCommit={(n) => setP({ termCoverEndAge: n })} /></Field>
         </div>
       </Card>
+
+      <RecommendCard />
 
       <Card title="5. 예산·계약">
         <div className="grid gap-6 sm:grid-cols-2">
