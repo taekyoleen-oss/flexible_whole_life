@@ -34,6 +34,11 @@ describe("프리셋 6종", () => {
 });
 
 describe("envelope", () => {
+  it("E02: 비율 20%를 넘어도 한 칸(0.1)까지는 허용한다", () => {
+    const S = [1, 1, 1, 1, 1, 0.3, 0.4, 0.5, 0.6, 0.6], C = new Array(11).fill(0);
+    expect(validate(S, C, base, DEFAULT_ENVELOPE).map((v) => v.code)).not.toContain("E02");
+    expect(validate([1, 1, 1, 1, 1, 0.3, 0.41, 0.41, 0.41, 0.41], C, base, DEFAULT_ENVELOPE).map((v) => v.code)).toContain("E02");
+  });
   const level = new Array(70).fill(1), C0 = new Array(71).fill(0);
   it("E01 초기 5년 변경", () => {
     const S = [...level]; S[3] = 1.2;

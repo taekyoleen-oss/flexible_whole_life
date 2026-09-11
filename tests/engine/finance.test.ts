@@ -37,18 +37,24 @@ describe("finance", () => {
   it("regularize: 증액은 앞당겨 제때 도달, 감액은 매년 1칸, 초기 5년 고정, 70세 후 증액 없음, 상하한", () => {
     const n = 30;
     const up = Array.from({ length: n }, (_, t) => (t >= 20 ? 1.5 : 1));
-    const m = regularizeShape(up, { fixYears: 5, step: 0.1, maxMultiple: 3, minRatio: 0.2 });
+    const m = regularizeShape(up, { fixYears: 5, step: 0.1, maxMultiple: 3, minMultiple: 0.2 });
     expect(m.slice(14, 21)).toEqual([1, 1, 1.1, 1.2, 1.3, 1.4, 1.5]);   // 16~19년에 매년 1칸, 20년째 1.5에 도달
     const down = Array.from({ length: n }, (_, t) => (t >= 8 ? 0.3 : 1));
-    const d = regularizeShape(down, { fixYears: 5, step: 0.1, maxMultiple: 3, minRatio: 0.2 });
+    const d = regularizeShape(down, { fixYears: 5, step: 0.1, maxMultiple: 3, minMultiple: 0.2 });
     expect(d.slice(7, 16)).toEqual([1, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.3]);   // 8년째부터 매년 1칸씩 늦게 내려간다
     const early = Array.from({ length: n }, (_, t) => (t === 2 ? 1.3 : 1));
-    expect(regularizeShape(early, { fixYears: 5, step: 0.1, maxMultiple: 3, minRatio: 0.2 }).slice(0, 8)).toEqual([1.3, 1.3, 1.3, 1.3, 1.3, 1.2, 1.1, 1]);
+    expect(regularizeShape(early, { fixYears: 5, step: 0.1, maxMultiple: 3, minMultiple: 0.2 }).slice(0, 8)).toEqual([1.3, 1.3, 1.3, 1.3, 1.3, 1.2, 1.1, 1]);
     const grow = Array.from({ length: n }, (_, t) => 1 + 0.1 * t);
-    const g = regularizeShape(grow, { fixYears: 5, step: 0.1, maxMultiple: 3, minRatio: 0.2, growthEndIndex: 10 });
+    const g = regularizeShape(grow, { fixYears: 5, step: 0.1, maxMultiple: 3, minMultiple: 0.2, growthEndIndex: 10 });
     expect(g[10]).toBe(2); expect(g[11]).toBe(2); expect(Math.max(...g)).toBe(2);
-    const cap = regularizeShape(Array.from({ length: n }, (_, t) => (t >= 5 ? 5 : 0.05)), { fixYears: 5, step: 0.1, maxMultiple: 3, minRatio: 0.2 });
-    expect(Math.max(...cap)).toBe(3); expect(Math.min(...cap)).toBeGreaterThanOrEqual(0.2 * cap[0]);
+    const cap = regularizeShape(Array.from({ length: n }, (_, t) => (t >= 5 ? 5 : 0.05)), { fixYears: 5, step: 0.1, maxMultiple: 3, minMultiple: 0.2 });
+    expect(Math.max(...cap)).toBe(3); expect(Math.min(...cap)).toBeGreaterThanOrEqual(0.2);
+    // 70세 이후에도 커지는 목표(상속세)가 앞으로 번지지 않는다: 70세 시점 1.0, 그 뒤 유지, 앞은 목표를 따라간다
+    const est = Array.from({ length: n }, (_, t) => 0.18 * 1.06 ** t);   // t=29 → 0.97, t=30 이후 계속 증가
+    const e = regularizeShape(est.concat(Array.from({ length: 20 }, (_, k) => est[n - 1] * 1.06 ** (k + 1))), { fixYears: 5, step: 0.1, maxMultiple: 3, minMultiple: 0.2, growthEndIndex: 29 });
+    expect(e[29]).toBeCloseTo(est[29], 2); expect(e[40]).toBe(e[29]); expect(e[0]).toBeLessThan(0.3);
+    const r5 = regularizeShape(Array.from({ length: n }, (_, t) => (t >= 25 ? 5 : 1)), { fixYears: 5, step: 0.1, maxMultiple: 3, minMultiple: 0.2 });
+    expect(r5.slice(0, 5)).toEqual([1, 1, 1, 1, 1]); expect(r5[5]).toBe(1); expect(r5[24]).toBe(2.9); expect(r5[25]).toBe(3);
   });
 });
 
@@ -58,6 +64,8 @@ describe("프리셋 필요액 곡선", () => {
     expect(c[0]).toBeGreaterThan(c[10]);
     expect(c[22]).toBe(needsP.finalExpense);   // 막내 3세 → 22년 후 독립
     expect(c[18]).toBe(6e7 * 0.7 * ((1 - 1.02 ** -4) / 0.02) + 2e8 + 3e7);   // 4년 남음, 둘 다(21·24세) 독립 전
+    const d = childNeedCurve({ income: 6e7, childrenAges: [3], debt: 1e8, debtYears: 10, debtRate: 0, debtMethod: "principal" }, needsP, 15);
+    expect(d[5] - c[5]).toBeCloseTo(1e8 * 0.5 - 1e8, 0 + 6);   // 부채 잔액(5년 후 5천만)이 더해진다(자녀 1명 차이 1억 제외)
     expect(c[20]).toBe(6e7 * 0.7 * ((1 - 1.02 ** -2) / 0.02) + 1e8 + 3e7);   // 2년 남음, 막내만 독립 전
   });
   it("부채상환형: 만기 뒤에는 정리자금만", () => {
@@ -74,6 +82,7 @@ describe("프리셋 필요액 곡선", () => {
   });
   it("단체보험보완형·상속준비형", () => {
     expect(groupGapRatio(1e8, 4e8)).toBe(0.75); expect(groupGapRatio(5e8, 4e8)).toBe(0); expect(groupGapRatio(1e8, 0)).toBe(1);
+    expect(0.75 * 4e8 + 1e8).toBe(4e8);   // 재직 중 개인 + 단체 = 전체 필요액(이중 차감 없음)
     const e = estateTaxCurve({ netAssets: 2e9, assetGrowth: 0.03, hasSpouse: true, children: 2 }, 30);
     expect(e[0]).toBeGreaterThan(0); expect(e[29]).toBeGreaterThan(e[0]);
     expect(estateTaxCurve({ netAssets: 5e8, assetGrowth: 0.03, hasSpouse: true, children: 2 }, 5)).toEqual([0, 0, 0, 0, 0]);

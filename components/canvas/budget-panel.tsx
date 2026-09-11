@@ -15,7 +15,7 @@ export function BudgetFields() {
   const setMonthly = (m: number) => dispatch({ type: "S0", S0: s0FromMonthly(m, eff.gross100k) });
   return (
     <div className="space-y-3">
-      <Field label={<>월 보험료 <FormulaHelp id="s0FromMonthly" /></>} hint={<>초기 보험금 {won(result.S[0] * state.S0)} · 총 납입 {won(eff.totalPaid)}{eff.isLow && " (저해지)"}</>}>
+      <Field label={<>월 보험료 <FormulaHelp id="s0FromMonthly" /></>} hint={<>초기 보험금 {won(result.S[0] * state.S0)} · 총 납입 {won(eff.totalPaid)}{eff.isLow && " (저해지)"} · 기준보험금이 1천만원 단위라 월 보험료가 그에 맞춰 조정됩니다</>}>
         <ManwonInput value={eff.monthly} onChange={setMonthly} min={MONTHLY_MIN} max={MONTHLY_MAX} />
       </Field>
       <input type="range" className="w-full accent-sky" min={MONTHLY_MIN} max={MONTHLY_MAX} step={1} aria-label="월 보험료 슬라이더"

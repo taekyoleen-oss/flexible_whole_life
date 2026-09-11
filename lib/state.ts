@@ -1,5 +1,5 @@
 import kli7 from "@/lib/engine/data/rates-kli7.json";
-import { ASSUMPTIONS, buildPreset, compute, DEFAULT_ENVELOPE, expandBlocks, getAssumption, toBlocks, type AssumptionSet, type Block, type DebtMethod, type EngineInput, type EngineResult, type EnvelopeParams, type PresetContext, type PresetId, type RateTable, type Sex } from "@/lib/engine";
+import { ASSUMPTIONS, buildPreset, PRESETS, compute, DEFAULT_ENVELOPE, expandBlocks, getAssumption, toBlocks, type AssumptionSet, type Block, type DebtMethod, type EngineInput, type EngineResult, type EnvelopeParams, type PresetContext, type PresetId, type RateTable, type Sex } from "@/lib/engine";
 import { clamp, roundS0, S0_MAX, S0_MIN, S0_UNIT } from "./format";
 import { presetNeeds } from "./preset-needs";
 export { roundS0, S0_MAX, S0_MIN, S0_UNIT };
@@ -45,7 +45,13 @@ export function sanitizeSettings(raw: unknown): Settings {
       needs: numObj(a.needs, base.needs),
     };
   }
-  return { assumption, envelope: numObj(r.envelope, DEFAULT_ENVELOPE) };
+  const e = numObj(r.envelope, DEFAULT_ENVELOPE);
+  // 편집기·프리셋이 기대는 범위로 묶는다(초기 고정 1년 이상, 0 < 하한 ≤ 상한, 금액 > 0)
+  const envelope: EnvelopeParams = {
+    fixYears: clamp(Math.round(e.fixYears), 1, 30), maxGrowth: clamp(e.maxGrowth, 0, 1), growthEndAge: clamp(Math.round(e.growthEndAge), 20, 100),
+    maxMultiple: clamp(e.maxMultiple, 1, 10), minMultiple: clamp(e.minMultiple, 0.01, Math.min(1, clamp(e.maxMultiple, 1, 10))), minAmount: Math.max(1, e.minAmount), uwLimit: Math.max(1e7, e.uwLimit),
+  };
+  return { assumption, envelope };
 }
 
 /** 숫자를 하나라도 고치면 사용자 정의 세트가 된다 */
@@ -77,6 +83,7 @@ export interface DesignState {
   waiver: boolean;
   lowSurrender: boolean;
   presetId: PresetId | "custom";
+  basePresetId?: PresetId;   // 직접 편집(custom)이 어느 프리셋에서 출발했는지
   blocks: Block[];       // death 카드(연속·빈틈 없음) + celebration 카드
   anchors: number[];     // 그래프에서 직접 정한 변경 연령(오름차순). 이 사이는 매년 한 칸씩 보간된다
   settings: Settings;    // 가정 세트·설계 제약
@@ -101,7 +108,7 @@ export const endAgeOf = (p: Profile) => omegaOf(p.sex) - 1;
 export interface InfoApplied { child: boolean; debt: boolean; retire: boolean; group: boolean; estate: boolean; income: boolean }   // 프리셋별 조건 반영. retire: 은퇴시기·은퇴 후 필요액(은퇴증액형, 단체보험보완형과 은퇴시기 공유), income: 기준보험금을 입력 기반으로 정했는지
 export const NO_INFO: InfoApplied = { child: false, debt: false, retire: false, group: false, estate: false, income: false };
 export const PRESET_FLAG: Partial<Record<PresetId, keyof InfoApplied>> = { child: "child", debt: "debt", retire: "retire", group: "group", estate: "estate", level: "income" };
-/** 표준 경계(가입 후 경과년 기준): 자녀 독립 20년 후(막내 5세 가정), 부채 만기 20년(5년 후부터 15년 감액), 단체보험 60세, 은퇴 65세 */
+/** 표준 경계(가입 후 경과년 기준): 자녀 독립 20년 후(막내 5세 가정), 부채 만기 20년(5년 후부터 15년 감액), 은퇴·단체보험 만기 65세 */
 export const STANDARD_BOUNDARY = { youngestChildAge: 5, debtYears: 20, retirementAge: 65 } as const;   // 단체보험 만기 = 은퇴시기
 
 /** 프리셋 경계. 반영 플래그가 켜진 항목만 프로필 값을 쓰고 나머지는 표준 경계 */
@@ -112,11 +119,11 @@ export function presetContext(p: Profile, env: EnvelopeParams = DEFAULT_ENVELOPE
   const targets: PresetContext["targets"] = {};
   for (const id of ["child", "debt", "retire", "group", "estate"] as const) {
     if (!applied[id]) continue;
-    const r = presetNeeds(id, p, assumption, TABLE, n, env);
+    const r = presetNeeds(id, p, assumption, TABLE, n, env, { retirementAge: applied.retire ? p.retirementAge : STANDARD_BOUNDARY.retirementAge });
     if (r?.available) targets[id] = { target: r.target, floor: r.floor };
   }
   return {
-    age: p.age, n, targets,
+    age: p.age, n, targets, fixYears: env.fixYears, maxMultiple: env.maxMultiple, minMultiple: env.minMultiple,
     youngestChildAge: applied.child && hasChild ? Math.min(...p.childrenAges) : STANDARD_BOUNDARY.youngestChildAge,
     debtYears: applied.debt && p.debt > 0 ? p.debtYears : STANDARD_BOUNDARY.debtYears,
     retirementAge: applied.retire ? p.retirementAge : STANDARD_BOUNDARY.retirementAge,
@@ -324,33 +331,42 @@ export function reducer(s: DesignState, a: Action): DesignState {
       const ia = (raw?.infoApplied ?? {}) as Partial<Record<keyof InfoApplied, unknown>>;
       const infoApplied: InfoApplied = { child: ia.child === true, debt: ia.debt === true, retire: ia.retire === true, group: ia.group === true, estate: ia.estate === true, income: ia.income === true };
       merged.infoApplied = infoApplied;
+      merged.basePresetId = raw?.basePresetId && raw.basePresetId in PRESETS ? raw.basePresetId : merged.presetId !== "custom" ? merged.presetId : undefined;
       return { ...withBlocks({ ...merged, payYears, S0, anchors }, deathSegments(blocks), celebrations(blocks)), updatedAt: merged.updatedAt };
     }
     case "reset": return { ...initialState(), settings: s.settings };
     case "resetDesign": {
       // 입력·설정·계약 조건은 두고 설계만 1억·표준 평준형으로. 변경점·축하금·입력 반영도 지운다
-      const next = { ...s, S0: 1e8, anchors: [], infoApplied: NO_INFO };
+      const next = { ...s, S0: 1e8, anchors: [], infoApplied: NO_INFO, basePresetId: "level" as const };
       return withBlocks(next, buildPreset("level", presetContext(s.profile, envelopeOf(s), NO_INFO, assumptionOf(s))), [], "level");
     }
     case "profile": {
       const profile = clampProfile({ ...s.profile, ...a.patch });
-      const next = { ...s, profile, anchors: cleanAnchors(s.anchors, profile, envelopeOf(s)) };
-      const deaths = s.presetId === "custom" ? deathSegments(s.blocks) : buildPreset(s.presetId, presetContext(profile, envelopeOf(s), s.infoApplied, assumptionOf(s)));
+      // 조건이 사라진 프리셋(부채 0, 자녀 없음 등)은 반영 표시를 끈다 — 체크된 채 표준 모양으로 조용히 돌아가지 않게
+      const infoApplied = { ...s.infoApplied };
+      for (const id of ["child", "debt", "group", "estate"] as const) {
+        if (infoApplied[id] && !presetNeeds(id, profile, assumptionOf(s), TABLE, termOf(profile), envelopeOf(s))?.available) infoApplied[id] = false;
+      }
+      const next = { ...s, profile, infoApplied, anchors: cleanAnchors(s.anchors, profile, envelopeOf(s)) };
+      const deaths = s.presetId === "custom" ? deathSegments(s.blocks) : buildPreset(s.presetId, presetContext(profile, envelopeOf(s), infoApplied, assumptionOf(s)));
       return withBlocks(next, deaths, celebrations(s.blocks));
     }
     case "S0": return touch({ S0: a.exact ? clamp(Math.round(a.S0), 0, S0_MAX) : roundS0(a.S0), infoApplied: { ...s.infoApplied, income: false } });   // exact: 재설계처럼 예산이 정한 값. 손으로 바꾸면 연소득 반영 표시는 해제
     case "payYears": return touch({ payYears: clamp(Math.round(a.payYears), 1, termOf(s.profile)) });
     case "waiver": return touch({ waiver: a.on });
     case "lowSurrender": return touch({ lowSurrender: a.on });
-    case "preset": return withBlocks({ ...s, anchors: [] }, buildPreset(a.id, presetContext(s.profile, envelopeOf(s), s.infoApplied, assumptionOf(s))), celebrations(s.blocks), a.id);
+    case "preset": return withBlocks({ ...s, anchors: [], basePresetId: a.id }, buildPreset(a.id, presetContext(s.profile, envelopeOf(s), s.infoApplied, assumptionOf(s))), celebrations(s.blocks), a.id);
     case "applyInfo": {
       // 입력 정보 반영: 체크한 경계만 프로필 값으로, 선택하면 기준보험금·프리셋도 함께. 프리셋 상태면 다시 그린다
-      const infoApplied: InfoApplied = { ...s.infoApplied, ...a.applied, income: a.S0 !== undefined ? true : (a.applied.income ?? s.infoApplied.income) };
-      const presetId = a.presetId ?? s.presetId;
+      const infoApplied: InfoApplied = { ...s.infoApplied, ...a.applied };
+      // 직접 편집 중(custom)에 어떤 프리셋의 조건을 켜면 그 프리셋 곡선으로 다시 그린다(화면에서 미리 확인을 받는다)
+      const turnedOn = (Object.keys(a.applied) as (keyof InfoApplied)[]).find((k) => a.applied[k] && !s.infoApplied[k] && k !== "income");
+      const fromFlag = turnedOn ? (Object.keys(PRESET_FLAG) as PresetId[]).find((id) => PRESET_FLAG[id] === turnedOn) : undefined;
+      const presetId = a.presetId ?? (s.presetId === "custom" && fromFlag ? fromFlag : s.presetId);
       const S0 = a.S0 !== undefined ? roundS0(a.S0) : s.S0;
       const next = { ...s, infoApplied, S0 };
       if (presetId === "custom") return touch({ infoApplied, S0 });
-      return withBlocks({ ...next, anchors: [] }, buildPreset(presetId, presetContext(s.profile, envelopeOf(s), infoApplied, assumptionOf(s))), celebrations(s.blocks), presetId);
+      return withBlocks({ ...next, anchors: [], basePresetId: presetId }, buildPreset(presetId, presetContext(s.profile, envelopeOf(s), infoApplied, assumptionOf(s))), celebrations(s.blocks), presetId);
     }
     case "settings": {
       const merged = sanitizeSettings({ ...s.settings, ...a.patch });

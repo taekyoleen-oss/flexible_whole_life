@@ -1,7 +1,7 @@
 "use client";
 import { useRef } from "react";
 import { FormulaText } from "@/components/formula-text";
-import { Button } from "@/components/ui";
+import { Button, onBackdropClick } from "@/components/ui";
 import { getFormula, type FormulaId } from "@/lib/formulas";
 
 /** 숫자 옆의 "?" 버튼. 누르면 그 값의 산출 수식·의미·변수를 팝업으로 보여준다 */
@@ -14,7 +14,7 @@ export function FormulaHelp({ id, className = "" }: { id: FormulaId; className?:
         className={`inline-flex h-4 w-4 items-center justify-center rounded-full border border-navy/30 align-middle text-[10px] leading-none text-navy/60 hover:bg-sky/10 hover:text-sky print:hidden ${className}`}
         onClick={(e) => { e.preventDefault(); e.stopPropagation(); dlg.current?.showModal(); }}>?</button>
       <dialog ref={dlg} className="m-auto w-[min(92vw,640px)] rounded-lg bg-white p-5 text-left shadow-xl backdrop:bg-navy/50"
-        onClick={(e) => { if (e.target === e.currentTarget) e.currentTarget.close(); }}>
+        onClick={onBackdropClick}>
         <div className="mb-1 text-xs text-navy/50">{f.group}</div>
         <h3 className="font-display text-lg text-navy"><FormulaText text={f.title} /></h3>
         <FormulaText block className="mt-3" text={f.formula} />

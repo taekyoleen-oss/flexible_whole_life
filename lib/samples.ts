@@ -4,9 +4,9 @@ import { evaluate, initialState, presetContext, s0FromMonthly, type DesignState,
 export interface Sample { id: string; label: string; description: string; monthly: number; profile: Partial<Profile>; presetId: PresetId }
 
 export const SAMPLES: Sample[] = [
-  { id: "child-35m", label: "35세 남 · 자녀연령형", description: "막내 2세, 월 20만원. 막내 독립(25세)까지 100%, 이후 30%", monthly: 2e5,
+  { id: "child-35m", label: "35세 남 · 자녀연령형", description: "막내 2세·연소득 7천만, 월 20만원. 유족 생활비·교육비 곡선을 따라 독립(25세)까지 줄어들고 이후 정리자금만", monthly: 2e5,
     profile: { sex: "M", age: 35, childrenAges: [2, 5], income: 7e7 }, presetId: "child" },
-  { id: "debt-45f", label: "45세 여 · 부채상환형", description: "대출 잔액 3억·만기 15년, 월 30만원. 만기까지 선형 감액 후 30%", monthly: 3e5,
+  { id: "debt-45f", label: "45세 여 · 부채상환형", description: "대출 잔액 3억·만기 15년(원리금균등 5%), 월 30만원. 잔액 곡선을 따라 줄어들고 만기 후 정리자금만", monthly: 3e5,
     profile: { sex: "F", age: 45, childrenAges: [15], income: 8e7, debt: 3e8, debtYears: 15 }, presetId: "debt" },
   { id: "estate-55m", label: "55세 남 · 상속준비형", description: "월 50만원. 초기 50%에서 매년 10%씩 체증, 최대 2배", monthly: 5e5,
     profile: { sex: "M", age: 55, childrenAges: [25, 28], income: 1e8, liquidAssets: 5e8 }, presetId: "estate" },

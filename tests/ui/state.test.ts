@@ -105,7 +105,7 @@ describe("프리셋", () => {
     for (let t = 0; t < L.length; t++) expect(L[t]).toBeGreaterThanOrEqual(ctx.targets!.child!.target[t] - 5e-5);   // 보장이 필요액 아래로 가지 않는다(소수 4자리 반올림 허용)
     expect(L[69]).toBeLessThan(0.3);                                                // 독립 뒤엔 정리자금(3천만)만 남아 표준(30%)보다 낮다
     expect(L[69]).toBeGreaterThanOrEqual(0.2 * L[0]);                                // E05 하한
-    s = reducer(s, { type: "applyInfo", applied: { child: false }, S0: 3e8, presetId: "level" });
+    s = reducer(s, { type: "applyInfo", applied: { child: false, income: true }, S0: 3e8, presetId: "level" });   // 기준보험금 반영 팝업은 income 표시를 함께 켠다
     expect(s.S0).toBe(3e8); expect(s.presetId).toBe("level"); expect(s.infoApplied.child).toBe(false);
     expect(s.infoApplied.income).toBe(true);                       // 기준보험금을 반영하면 연소득 반영 표시
     expect(reducer(s, { type: "S0", S0: 2e8 }).infoApplied.income).toBe(false);   // 손으로 바꾸면 해제

@@ -9,7 +9,7 @@ const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains" }
 
 export const metadata: Metadata = {
   title: "설계형 종신보험",
-  description: "연령별 보험금 스케줄을 설계하고 보험료·준비금·해약환급금을 즉시 산출",
+  description: "보험사가 정한 보험금 구조 대신 계약자가 연령별 보험금을 직접 설계하고 보험료·준비금·해약환급금을 즉시 산출",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -21,7 +21,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body className="min-h-screen bg-cream text-ink antialiased">
         <DesignProvider>
           <header className="border-b border-navy/10 bg-white">
-            <nav className="mx-auto flex max-w-[1536px] items-center gap-6 px-4 py-3">
+            <nav className="mx-auto flex max-w-[1536px] flex-wrap items-center gap-x-5 gap-y-1 px-4 py-3">
               <Link href="/" className="font-display text-xl text-navy">설계형 종신보험</Link>
               <Link href="/design" className="text-sm text-navy/70 hover:text-navy">설계</Link>
               <Link href="/compare" className="text-sm text-navy/70 hover:text-navy">비교</Link>

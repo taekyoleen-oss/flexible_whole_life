@@ -99,7 +99,7 @@ export function ScheduleEditor({ height, amount, readOnly = false }: { height: n
   for (let a = x0; a <= x0 + n; a += 5) xTicks.push(a);
 
   return (
-    <div ref={box} className="w-full select-none">
+    <div ref={box} className="w-full select-none overflow-x-auto">
       <svg width={W} height={H} tabIndex={readOnly ? -1 : 0} role={readOnly ? "img" : "application"}
         aria-label={readOnly ? "보험금 스케줄" : `보험금 스케줄 편집기. ${first}세 이후 연령을 클릭하고 위아래로 드래그하거나 화살표 키로 조정`}
         className="block touch-none rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-sky"

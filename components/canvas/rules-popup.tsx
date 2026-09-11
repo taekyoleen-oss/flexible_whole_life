@@ -2,7 +2,7 @@
 import { useRef } from "react";
 import { useDesign } from "@/components/design-provider";
 import { FormulaHelp } from "@/components/formula-help";
-import { Button } from "@/components/ui";
+import { Button, onBackdropClick } from "@/components/ui";
 import { won } from "@/lib/format";
 import { envelopeOf, STEP, CELEBRATION_RATIO } from "@/lib/state";
 
@@ -16,10 +16,10 @@ export function RulesButton() {
     ["1칸", "단위", `그래프 1칸 = 기준보험금의 ${STEP * 100}% (${won(STEP * state.S0)}). 기준보험금은 1천만원 단위입니다.`],
     ["±칸", "이동 범위", "연령 A에서 움직일 수 있는 칸 수 = A − 직전 변경점(없으면 첫 편집 연령). 직전 변경점이 정한 수준에서 그 칸 수만큼 위아래로."],
     ["1칸/년", "매년 한 칸", "올리든 내리든 보험금은 매년 한 칸을 넘게 변하지 않습니다. 변경 연령 앞에는 매년 한 칸씩 잇는 램프가 놓입니다."],
-    ["E02", "연 증가율", `한 해 증가율은 ${e.maxGrowth * 100}%를 넘을 수 없습니다.`],
+    ["E02", "연 증가율", `한 해 증가율은 ${e.maxGrowth * 100}%를 넘을 수 없습니다(단, 한 칸 10%는 항상 허용).`],
     ["E03", "증액 종료", `${e.growthEndAge}세 이후에는 증액할 수 없습니다(감액은 가능).`],
     ["E04", "상한", `보험금 배수는 최대 ${e.maxMultiple}배입니다.`],
-    ["E05", "감액 하한", `초기 보험금의 ${e.minMultiple * 100}% 아래로 줄일 수 없습니다.`],
+    ["E05", "감액 하한", `기준보험금의 ${e.minMultiple * 100}% 아래로 줄일 수 없습니다.`],
     ["E06", "최소 금액", `보험금은 ${won(e.minAmount)} 이상이어야 합니다.`],
     ["E07", "심사 한도", `기준보험금은 ${won(e.uwLimit)}까지입니다.`],
     ["E08", "축하금", `축하금은 해당 연령 사망보험금의 ${CELEBRATION_RATIO * 100}%이며, 누계가 그때까지 낸 보험료를 넘을 수 없습니다.`],
@@ -29,7 +29,7 @@ export function RulesButton() {
   return (
     <>
       <Button onClick={() => dlg.current?.showModal()}>설계 규칙</Button>
-      <dialog ref={dlg} className="m-auto w-[min(92vw,680px)] whitespace-normal rounded-lg bg-white p-5 text-left shadow-xl backdrop:bg-navy/50" onClick={(e) => { if (e.target === e.currentTarget) e.currentTarget.close(); }}>
+      <dialog ref={dlg} className="m-auto w-[min(92vw,680px)] whitespace-normal rounded-lg bg-white p-5 text-left shadow-xl backdrop:bg-navy/50" onClick={onBackdropClick}>
         <h3 className="font-display text-lg text-navy">설계 규칙 <FormulaHelp id="envelope" /> <FormulaHelp id="step" /></h3>
         <p className="mt-1 text-xs text-navy/60">설정 화면의 값을 그대로 보여줍니다. 모든 프리셋과 그래프 편집은 이 규칙 안에서만 움직입니다.</p>
         <table className="mt-3 w-full text-sm">

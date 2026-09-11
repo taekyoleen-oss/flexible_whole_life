@@ -2,7 +2,7 @@
 import { Fragment, useRef, useState } from "react";
 import { useDesign } from "@/components/design-provider";
 import { FormulaHelp } from "@/components/formula-help";
-import { Button, Field, ManwonInput } from "@/components/ui";
+import { Button, Field, ManwonInput, onBackdropClick } from "@/components/ui";
 import { PRESETS } from "@/lib/engine";
 import { won } from "@/lib/format";
 import { recommend } from "@/lib/recommend";
@@ -23,7 +23,8 @@ export function FinanceButton({ compact = false }: { compact?: boolean }) {
   const setP = (patch: Partial<Profile>) => dispatch({ type: "profile", patch });
   const open = () => { setAmount(state.infoApplied.income ? "keep" : "needs"); setUsePreset(false); dlg.current?.showModal(); };
   const apply = () => {
-    dispatch({ type: "applyInfo", applied: {}, S0: amount === "needs" ? r.suggestedS0 : amount === "hlv" ? r.hlvS0 : undefined, presetId: usePreset ? r.presetId : undefined });
+    if (usePreset && state.presetId === "custom" && !confirm("직접 편집한 모양이 지워지고 추천 프리셋으로 다시 그립니다. 계속할까요?")) return;
+    dispatch({ type: "applyInfo", applied: amount === "keep" ? {} : { income: true }, S0: amount === "needs" ? r.suggestedS0 : amount === "hlv" ? r.hlvS0 : undefined, presetId: usePreset ? r.presetId : undefined });
     dlg.current?.close();
   };
   const rows: [string, string][] = [
@@ -33,7 +34,7 @@ export function FinanceButton({ compact = false }: { compact?: boolean }) {
   return (
     <>
       {compact ? <button type="button" className="rounded border border-navy/20 px-1.5 py-0.5 text-xs text-navy hover:bg-navy/5" onClick={open}>입력</button> : <Button primary onClick={open}>재무정보·기준보험금</Button>}
-      <dialog ref={dlg} className="m-auto w-[min(92vw,640px)] whitespace-normal rounded-lg bg-white p-5 text-left shadow-xl backdrop:bg-navy/50" onClick={(e) => { if (e.target === e.currentTarget) e.currentTarget.close(); }}>
+      <dialog ref={dlg} className="m-auto w-[min(92vw,640px)] whitespace-normal rounded-lg bg-white p-5 text-left shadow-xl backdrop:bg-navy/50" onClick={onBackdropClick}>
         <h3 className="font-display text-lg text-navy">재무정보·기준보험금</h3>
         <p className="mt-1 text-xs text-navy/60">설계는 기준보험금 1억으로 시작합니다. 재무 정보를 넣으면 필요보장(니즈)과 인적자본(HLV)이 계산되고, 고른 금액을 &quot;적용&quot;하면 설계의 기준보험금이 바뀝니다.</p>
 

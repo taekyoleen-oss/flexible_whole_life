@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from "react";
+import { useEffect, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type MouseEvent } from "react";
 import { clamp } from "@/lib/format";
 
 export function Card({ title, children, className = "" }: { title?: ReactNode; children: ReactNode; className?: string }) {
@@ -9,6 +9,12 @@ export function Card({ title, children, className = "" }: { title?: ReactNode; c
       {children}
     </section>
   );
+}
+
+/** <dialog>의 onClick: 패딩(여백)을 눌러도 닫히지 않고 배경(backdrop)을 눌렀을 때만 닫는다 */
+export function onBackdropClick(e: MouseEvent<HTMLDialogElement>) {
+  const r = e.currentTarget.getBoundingClientRect();
+  if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) e.currentTarget.close();
 }
 
 export function Field({ label, hint, children }: { label: ReactNode; hint?: ReactNode; children: ReactNode }) {

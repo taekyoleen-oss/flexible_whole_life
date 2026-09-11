@@ -8,7 +8,7 @@ import { downloadWorkbook } from "@/lib/excel";
 import { encodeShare } from "@/lib/share";
 
 export function DesignToolbar() {
-  const { state, result, dispatch } = useDesign();
+  const { state, result, dispatch, undo, canUndo } = useDesign();
   const [msg, setMsg] = useState("");
   const flash = (t: string) => { setMsg(t); setTimeout(() => setMsg(""), 2500); };
   const share = async () => {
@@ -30,7 +30,8 @@ export function DesignToolbar() {
   return (
     <div className="mb-4 flex flex-wrap items-center gap-2">
       <Button primary onClick={save}>보관함에 저장</Button>
-      <Button onClick={() => { if (confirm("설계를 기준보험금 1억·표준 평준형으로 초기화합니다. 입력 정보와 설정은 유지됩니다.")) dispatch({ type: "resetDesign" }); }}>설계 초기화</Button>
+      <Button onClick={undo} disabled={!canUndo} title="직전 편집을 되돌립니다">되돌리기</Button>
+      <Button onClick={() => { if (confirm("설계를 기준보험금 1억·표준 평준형으로 초기화합니다. 변경점·축하금·조건 반영 체크가 모두 지워지고, 입력 정보와 설정은 유지됩니다.")) dispatch({ type: "resetDesign" }); }}>설계 초기화</Button>
       <Button onClick={exportFile}>JSON 내보내기</Button>
       <Button onClick={() => downloadWorkbook(state, result, `검산_${autoName(state).replace(/[^\w가-힣]+/g, "_")}.xlsx`)}>Excel 검산</Button>
       <Button onClick={share}>공유 링크 복사</Button>
@@ -38,7 +39,7 @@ export function DesignToolbar() {
       <Link href="/print" className={link}>제안서 인쇄</Link>
       <Link href="/redesign" className={link}>재설계</Link>
       <Link href="/settings" className={link}>설정</Link>
-      {msg && <span className="text-xs text-emerald-700">{msg}</span>}
+      <span className="text-xs text-emerald-700" aria-live="polite">{msg}</span>
     </div>
   );
 }

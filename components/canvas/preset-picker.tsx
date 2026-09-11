@@ -2,7 +2,8 @@
 import { Fragment, useRef, type ReactNode } from "react";
 import { useDesign } from "@/components/design-provider";
 import { FormulaHelp } from "@/components/formula-help";
-import { Button, Card, Field, Input, ManwonInput, NumInput, Select } from "@/components/ui";
+import Link from "next/link";
+import { Button, Card, Field, Input, ManwonInput, NumInput, Select, onBackdropClick } from "@/components/ui";
 import { PRESETS, type PresetId } from "@/lib/engine";
 import type { FormulaId } from "@/lib/formulas";
 import { won } from "@/lib/format";
@@ -30,7 +31,7 @@ function EvidenceButton({ id }: { id: PresetId }) {
   return (
     <>
       <button type="button" aria-label={`${PRESETS[id].label} 근거`} title="근거" className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-navy/30 text-[10px] leading-none text-navy/60 hover:bg-sky/10 hover:text-sky" onClick={() => dlg.current?.showModal()}>?</button>
-      <dialog ref={dlg} className={dialogCls} onClick={(e) => { if (e.target === e.currentTarget) e.currentTarget.close(); }}>
+      <dialog ref={dlg} className={dialogCls} onClick={onBackdropClick}>
         <h3 className="font-display text-lg text-navy">{PRESETS[id].label} · 근거 <FormulaHelp id={info.formula as FormulaId} /> <FormulaHelp id="shapeRules" /></h3>
         <p className="mt-3 text-sm text-ink">{info.theory}</p>
         <p className="mt-2 text-xs text-navy/60"><span className="font-medium text-navy">표준 모양</span> · {info.standard}</p>
@@ -54,17 +55,17 @@ function InputButton({ id, children }: { id: PresetId; children: ReactNode }) {
   const ev = presetEvidence(id, state);
   const flag = flagOf(id);
   const a = state.settings.assumption.needs;
-  const assumptions: Partial<Record<PresetId, string>> = {
-    child: `가정: 생활비 비율 ${a.livingRatio * 100}% · 자녀 1인 ${won(a.educationPerChild)} · 독립 ${a.independenceAge}세 · 정리자금 ${won(a.finalExpense)} · 할인율 ${a.discount * 100}% (설정 화면)`,
-    debt: `가정: 정리자금 ${won(a.finalExpense)} (설정 화면)`,
-    retire: `가정: 정리자금 ${won(a.finalExpense)} · 할인율 ${a.discount * 100}% · 기대여명은 제7회 경험생명표`,
+  const assumptions: Partial<Record<PresetId, ReactNode>> = {
+    child: <>가정: 생활비 비율 {a.livingRatio * 100}% · 자녀 1인 {won(a.educationPerChild)} · 독립 {a.independenceAge}세 · 정리자금 {won(a.finalExpense)} · 할인율 {a.discount * 100}% (<Link href="/settings" className="underline">설정</Link>)</>,
+    debt: <>가정: 정리자금 {won(a.finalExpense)} (<Link href="/settings" className="underline">설정</Link>)</>,
+    retire: <>가정: 정리자금 {won(a.finalExpense)} · 할인율 {a.discount * 100}% · 기대여명은 제7회 경험생명표 (<Link href="/settings" className="underline">설정</Link>)</>,
     group: "필요액은 평준형(니즈) 입력과 같은 공통 값으로 계산합니다",
     estate: "상속세: 일괄공제 5억 · 배우자공제 max(5억, min(법정지분, 30억)) · 세율 10~50% (2024년 근사)",
   };
   return (
     <>
       <button type="button" className={smallBtn} onClick={() => dlg.current?.showModal()}>입력</button>
-      <dialog ref={dlg} className={dialogCls} onClick={(e) => { if (e.target === e.currentTarget) e.currentTarget.close(); }}>
+      <dialog ref={dlg} className={dialogCls} onClick={onBackdropClick}>
         <h3 className="font-display text-lg text-navy">{PRESETS[id].label} · 조건 입력</h3>
         <p className="mt-1 text-xs text-navy/60">{PRESET_INFO[id].inputs}</p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">{children}</div>
@@ -77,7 +78,7 @@ function InputButton({ id, children }: { id: PresetId; children: ReactNode }) {
                 <Figures rows={ev.figures} />
                 <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
                   <span className="text-navy/70">기준보험금 제안 <span className="font-mono text-navy">{won(ev.proposedS0)}</span>{state.S0 === ev.proposedS0 && <span className="ml-1 text-sky">(적용됨)</span>}</span>
-                  <Button onClick={() => dispatch({ type: "applyInfo", applied: { [flag]: true }, S0: ev.proposedS0 })}>기준보험금으로 적용</Button>
+                  <Button onClick={() => { if (!confirmRedraw(state.presetId, state.infoApplied[flag])) return; dispatch({ type: "applyInfo", applied: { [flag]: true }, S0: ev.proposedS0 }); }}>기준보험금 적용 + 반영</Button>
                 </div>
               </>
             ) : <p className="mt-1 text-xs text-navy/60">{ev.reason}</p>}
@@ -85,33 +86,53 @@ function InputButton({ id, children }: { id: PresetId; children: ReactNode }) {
         )}
         <div className="mt-4 flex justify-end gap-2">
           <Button onClick={() => dlg.current?.close()}>닫기</Button>
-          <Button primary disabled={!ev?.available} onClick={() => { dispatch({ type: "applyInfo", applied: { [flag]: true } }); dlg.current?.close(); }}>반영하고 닫기</Button>
+          <Button primary disabled={!ev?.available} onClick={() => { if (!confirmRedraw(state.presetId, state.infoApplied[flag])) return; dispatch({ type: "applyInfo", applied: { [flag]: true } }); dlg.current?.close(); }}>반영하고 닫기</Button>
         </div>
       </dialog>
     </>
   );
 }
 
+/** 직접 편집 중이면 프리셋 곡선으로 다시 그려진다는 확인을 받는다 */
+function confirmRedraw(presetId: string, alreadyOn: boolean) {
+  return presetId !== "custom" || alreadyOn || confirm("직접 편집한 모양이 지워지고 이 프리셋의 곡선으로 다시 그립니다. 계속할까요?");
+}
+
 function ApplyCheck({ id, label = "반영" }: { id: PresetId; label?: string }) {
   const { state, dispatch } = useDesign();
   const flag = flagOf(id);
   const b = boundaryLabel(flag, state);
+  const on = state.infoApplied[flag];
   return (
-    <label className="flex items-center gap-1" title={b.text}>
-      <input type="checkbox" className="accent-sky" disabled={!b.available} checked={state.infoApplied[flag]}
-        onChange={(e) => id === "level" ? (e.target.checked ? dispatch({ type: "applyInfo", applied: {}, S0: recommend(state).suggestedS0 }) : dispatch({ type: "S0", S0: 1e8 })) : dispatch({ type: "applyInfo", applied: { [flag]: e.target.checked } })} />
-      <span>{label}</span>
-    </label>
+    <span className="flex flex-col">
+      <label className="flex items-center gap-1" title={b.text}>
+        <input type="checkbox" className="accent-sky" disabled={!b.available} checked={on}
+          onChange={(e) => {
+            const checked = e.target.checked;
+            if (id === "level") { dispatch({ type: "applyInfo", applied: { income: checked }, S0: checked ? recommend(state).suggestedS0 : undefined }); return; }   // 끄면 표시만 끄고 기준보험금은 그대로
+            if (checked && !confirmRedraw(state.presetId, on)) return;
+            dispatch({ type: "applyInfo", applied: { [flag]: checked } });
+          }} />
+        <span>{label}</span>
+      </label>
+      {!b.available && <span className="text-[10px] leading-tight text-navy/50">{b.text}</span>}
+    </span>
   );
 }
 
-function RetireSelect() {
+/** 은퇴시기 선택(은퇴증액형·단체보험보완형이 같은 값). 바꾸면 그 카드의 조건이 반영된다 */
+function RetireSelect({ id }: { id: PresetId }) {
   const { state, dispatch } = useDesign();
+  const flag = flagOf(id);
   return (
-    <label className="flex items-center gap-1" title={boundaryLabel("retire", state).text}>
+    <label className="flex items-center gap-1" title={`${boundaryLabel("retire", state).text} · 은퇴증액형·단체보험보완형 공통`}>
       <span>은퇴</span>
-      <select className="rounded border border-navy/20 bg-white px-1 py-0.5 text-xs" value={state.profile.retirementAge} aria-label="은퇴시기"
-        onChange={(e) => { dispatch({ type: "profile", patch: { retirementAge: Number(e.target.value) } }); dispatch({ type: "applyInfo", applied: { retire: true } }); }}>
+      <select className="rounded border border-navy/20 bg-white px-1 py-0.5 text-xs" value={state.profile.retirementAge} aria-label="은퇴시기(공통)"
+        onChange={(e) => {
+          dispatch({ type: "profile", patch: { retirementAge: Number(e.target.value) } });
+          if (!state.infoApplied[flag] && !confirmRedraw(state.presetId, false)) return;
+          dispatch({ type: "applyInfo", applied: { [flag]: true } });
+        }}>
         {RETIRE_OPTIONS.map((v) => <option key={v} value={v}>{v}세</option>)}
         {!RETIRE_OPTIONS.includes(state.profile.retirementAge as (typeof RETIRE_OPTIONS)[number]) && <option value={state.profile.retirementAge}>{state.profile.retirementAge}세</option>}
       </select>
@@ -167,7 +188,7 @@ function EstateFields() {
       <Field label="순자산 (부동산·금융 − 부채)"><ManwonInput value={f.p.netAssets} onChange={(v) => f.setP({ netAssets: v })} max={1e7} /></Field>
       <Field label="자산 증가율 (연)">{f.pctInput(f.p.assetGrowth, (v) => f.setP({ assetGrowth: v }), 20)}</Field>
       {f.spouse}
-      <Field label={<>자녀 수<Common /></>} hint="자녀연령형의 자녀 나이에서 가져옵니다"><div className="flex h-9 items-center text-sm">{f.p.childrenAges.length}명</div></Field>
+      {f.childrenAges}
     </>
   );
 }
@@ -177,23 +198,29 @@ const FIELDS: Partial<Record<PresetId, () => ReactNode>> = { child: ChildFields,
 /** 프리셋 6종. 카드 아래에 [반영] [입력] [?근거]. 조건을 반영하면 필요액 곡선을 설계 규칙에 맞춰 그린다 */
 export function PresetPicker() {
   const { state, dispatch } = useDesign();
+  const custom = state.presetId === "custom";
+  const baseLabel = state.basePresetId ? PRESETS[state.basePresetId].label : null;
   return (
-    <Card title={<span className="flex flex-wrap items-center justify-between gap-2">프리셋 {state.presetId === "custom" && <span className="rounded bg-navy/5 px-2 py-0.5 font-sans text-xs font-normal text-navy/70">직접 편집 중</span>}</span>}>
-      <p className="mb-2 text-xs text-navy/60">기준보험금 1억, 표준 모양으로 시작합니다. 카드의 &quot;입력&quot;에서 조건을 넣고 &quot;반영&quot;을 켜면 이론·수식으로 계산한 필요액 곡선을 설계 규칙에 맞춰 그립니다. &quot;?&quot;가 근거를 보여줍니다.</p>
+    <Card title={<span className="flex flex-wrap items-center justify-between gap-2">프리셋 {custom && <span className="rounded bg-navy/5 px-2 py-0.5 font-sans text-xs font-normal text-navy/70">{baseLabel ? `${baseLabel} 기반 · ` : ""}직접 편집 중</span>}</span>}>
+      <p className="mb-2 text-xs text-navy/60">기준보험금 1억, 표준 모양으로 시작합니다. 카드의 &quot;입력&quot;에서 조건을 넣고 &quot;반영&quot;을 켜면 이론·수식으로 계산한 필요액 곡선을 설계 규칙에 맞춰 그립니다. &quot;?&quot;가 근거를 보여줍니다. 그래프를 직접 고치면 그 모양이 우선하며, 카드를 다시 누르면 곡선으로 돌아갑니다.</p>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
         {(Object.keys(PRESETS) as PresetId[]).map((id) => {
           const active = state.presetId === id;
           const Fields = FIELDS[id];
+          const flag = flagOf(id);
+          const applied = state.infoApplied[flag] && id !== "level";
+          const desc = applied ? `조건 반영: ${boundaryLabel(flag, state).text}` : PRESETS[id].description;
           return (
-            <div key={id} className={`flex flex-col rounded border transition-colors ${active ? "border-sky bg-sky/10" : "border-navy/15"}`}>
-              <button type="button" onClick={() => dispatch({ type: "preset", id })} aria-pressed={active} className="flex-1 p-2 text-left hover:bg-navy/5">
+            <div key={id} className={`flex flex-col rounded border transition-colors ${active ? "border-sky bg-sky/10" : custom && state.basePresetId === id ? "border-sky/50" : "border-navy/15"}`}>
+              <button type="button" aria-pressed={active} className="flex-1 p-2 text-left hover:bg-navy/5"
+                onClick={() => { if (custom && !confirm(`직접 편집한 모양이 지워지고 ${PRESETS[id].label} 모양으로 다시 그립니다. 계속할까요?`)) return; dispatch({ type: "preset", id }); }}>
                 <div className="text-sm font-medium text-navy">{PRESETS[id].label}</div>
-                <div className="text-xs text-navy/60">{PRESETS[id].description}</div>
+                <div className="text-xs text-navy/60">{desc}</div>
               </button>
               <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-t border-navy/10 px-2 py-1.5 text-xs">
-                {id === "level" ? <><ApplyCheck id="level" label="연소득 반영" /><FinanceButton compact /></> : <>
+                {id === "level" ? <><ApplyCheck id="level" label="니즈 기준보험금" /><FinanceButton compact /></> : <>
                   <ApplyCheck id={id} />
-                  {(id === "retire" || id === "group") && <RetireSelect />}
+                  {(id === "retire" || id === "group") && <RetireSelect id={id} />}
                   {Fields && <InputButton id={id}><Fields /></InputButton>}
                 </>}
                 <EvidenceButton id={id} />

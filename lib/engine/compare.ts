@@ -27,7 +27,7 @@ export function compareAtBudget(budget: number, base: Omit<EngineInput, "S0">, a
     id, label, S0, monthly: Math.round(r.monthly.gross + (term?.monthly.gross ?? 0)),
     pvBenefit: (r.perUnit.pvb * r.S0 + (term ? term.perUnit.pvb * term.S0 : 0)) / 1e5,
     totalPaid: r.totalPaid + (term?.totalPaid ?? 0),
-    cashRateAtPayEnd: r.surrender.rate[base.payYears],
+    cashRateAtPayEnd: term ? (r.surrender.cash[base.payYears] + (term.surrender.cash[Math.min(base.payYears, term.n)] ?? 0)) / (r.surrender.paid[base.payYears] + (term.surrender.paid[Math.min(base.payYears, term.n)] ?? 0)) : r.surrender.rate[base.payYears],
     S: r.S.map((m, t) => m * r.S0 + (term && t < term.n ? term.S[t] * term.S0 : 0)),
     parts: { whole: r, term },
   });

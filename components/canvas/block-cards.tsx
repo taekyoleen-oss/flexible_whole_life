@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import { useDesign } from "@/components/design-provider";
 import { Button, NumInput } from "@/components/ui";
 import { won } from "@/lib/format";
@@ -12,12 +13,13 @@ export function BlockCards() {
   const yearsOf = (codes: string[]) => new Set(violations.flatMap((v) => (v.year === undefined || !codes.includes(v.code) ? [] : [age + v.year])));
   const badSeg = yearsOf(["E01", "E02", "E03"]);
   const badCel = yearsOf(["E08"]);
+  const [open, setOpen] = useState(state.presetId === "custom");
   const isBad = (from: number, to: number) => [...badSeg].some((a) => a >= from && a <= to);
 
   return (
-    <details open={state.presetId === "custom"} className="rounded-lg border border-navy/10 bg-white p-4 shadow-sm">
+    <details open={open} onToggle={(e) => setOpen(e.currentTarget.open)} className="rounded-lg border border-navy/10 bg-white p-4 shadow-sm">
       <summary className="cursor-pointer font-display text-lg text-navy">구간 카드 편집</summary>
-      <p className="mt-1 text-xs text-navy/50">초기 {fix}년({age}~{age + fix - 1}세)은 고정, 증액은 연 {Math.round(env.maxGrowth * 100)}% 이내·{env.growthEndAge}세 전까지.</p>
+      <p className="mt-1 text-xs text-navy/50">초기 {fix}년({age}~{age + fix - 1}세)은 고정, 증액은 매년 1칸(10%) 또는 연 {Math.round(env.maxGrowth * 100)}% 이내·{env.growthEndAge}세 전까지.</p>
 
       <ul className="mt-3 space-y-2">
         {segs.map((b, i) => {

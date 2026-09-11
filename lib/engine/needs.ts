@@ -12,7 +12,7 @@ export function needs(i: NeedsInput, p: AssumptionSet["needs"]): NeedsResult {
   const yearsToIndependence = youngest === undefined ? 0 : Math.max(0, p.independenceAge - youngest);
   const yearsToRetirement = Math.max(0, p.retirementAge - i.age);
   const living = i.income * p.livingRatio * annuity(yearsToIndependence, p.discount);
-  const education = i.childrenAges.length * p.educationPerChild;
+  const education = i.childrenAges.filter((a) => a < p.independenceAge).length * p.educationPerChild;   // 이미 독립한 자녀는 제외
   const offset = i.existingCover + i.liquidAssets;
   const total = living + education + i.debt + p.finalExpense - offset;
   return { needs: Math.max(0, total), hlv: i.income * (1 - p.selfRatio) * annuity(yearsToRetirement, p.discount), yearsToIndependence, yearsToRetirement,
@@ -34,13 +34,14 @@ type NeedsParams = AssumptionSet["needs"];
  * 자녀연령형 필요액 곡선(원). t년 후: 생활비 Y·ρ·a(막내 독립까지 남은 연수) + 교육비 E × 아직 독립 전인 자녀 수 + 정리자금 F.
  * 독립 뒤에는 생활비·교육비가 0이 되어 F만 남는다.
  */
-export function childNeedCurve(i: { income: number; childrenAges: number[] }, p: NeedsParams, n: number): number[] {
+export function childNeedCurve(i: { income: number; childrenAges: number[]; debt?: number; debtYears?: number; debtRate?: number; debtMethod?: DebtMethod }, p: NeedsParams, n: number): number[] {
   const youngest = i.childrenAges.length ? Math.min(...i.childrenAges) : p.independenceAge;
   return Array.from({ length: n }, (_, t) => {
     const remain = Math.max(0, p.independenceAge - youngest - t);
     const living = i.income * p.livingRatio * annuity(remain, p.discount);
     const education = i.childrenAges.filter((a) => a + t < p.independenceAge).length * p.educationPerChild;
-    return living + education + p.finalExpense;
+    const debt = i.debt && i.debt > 0 ? remainingPrincipal(i.debt, i.debtRate ?? 0, i.debtYears ?? 1, t, i.debtMethod ?? "annuity") : 0;   // 부채가 있으면 그 시점 잔액도 유족 부담
+    return living + education + debt + p.finalExpense;
   });
 }
 
@@ -58,7 +59,7 @@ export function retireNeed(i: { age: number; retirementAge: number; hasSpouse: b
   const years = Math.max(0, i.retirementAge - i.age);
   const spouseAgeAtRetire = i.spouseAge + years;
   const expectancy = i.hasSpouse ? lifeExpectancy(table, i.spouseSex, spouseAgeAtRetire) : 0;
-  const living = i.hasSpouse ? i.livingMonthly * 12 * annuity(Math.round(expectancy), p.discount) : 0;
+  const living = i.hasSpouse ? i.livingMonthly * 12 * annuity(expectancy, p.discount) : 0;
   const post = Math.max(0, living + p.finalExpense - i.retireAssets);
   const ratio = i.preNeed > 0 ? post / i.preNeed : 1;
   return { spouseAgeAtRetire, expectancy, living, post, ratio };

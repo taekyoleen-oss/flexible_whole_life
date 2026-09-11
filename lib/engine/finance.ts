@@ -47,26 +47,29 @@ export function inheritanceTax(estate: number, hasSpouse: boolean, children: num
   return { tax: Math.max(0, taxable * rate - sub), taxable, deduction };
 }
 
-export interface ShapeRules { fixYears: number; step: number; maxMultiple: number; minRatio: number; floor?: number; growthEndIndex?: number }
+export interface ShapeRules { fixYears: number; step: number; maxMultiple: number; minMultiple: number; floor?: number; growthEndIndex?: number }
 
 /**
  * 필요액 곡선(배수 target)을 설계 규칙에 맞는 배수로 바꾼다. 보장이 필요액 아래로 내려가지 않도록 증액은 앞당기고 감액은 늦춘다.
+ * 0) 목표를 먼저 상한(E04)·하한으로 자르고 growthEndIndex 뒤의 증가를 없앤다(E03) — 뒤 구간의 과다 목표가 앞으로 번지지 않게
  * 1) 뒤→앞 m_t = max(target_t, m_{t+1} − step): 증액을 미리 시작해 제때 도달(매년 ≤ 1칸)
  * 2) 앞→뒤 m_t = max(m_t, m_{t−1} − step): 감액도 매년 ≤ 1칸
  * 3) 초기 fixYears는 그 구간 최댓값으로 고정(E01) 후 2)를 다시 적용
- * 4) growthEndIndex 이후 증액 없음(E03)  5) 상한 maxMultiple(E04), 하한 max(초기 × minRatio(E05), floor)
+ * 4) growthEndIndex 이후 증액 없음(E03) 재확인  5) 하한 max(minMultiple(E05, 기준보험금 기준 절대값), floor)
  */
 export function regularizeShape(target: number[], r: ShapeRules): number[] {
   const n = target.length, s = r.step;
-  const m = target.map((v) => Math.max(0, v));
+  const lo = Math.max(r.minMultiple, r.floor ?? 0);
+  const m = target.map((v) => (Number.isFinite(v) ? Math.min(r.maxMultiple, Math.max(lo, v)) : lo));
+  const noGrowthAfterEnd = () => { if (r.growthEndIndex !== undefined) for (let t = Math.max(1, r.growthEndIndex + 1); t < n; t++) m[t] = Math.min(m[t], m[t - 1]); };
+  noGrowthAfterEnd();
   for (let t = n - 2; t >= 0; t--) m[t] = Math.max(m[t], m[t + 1] - s);
   const lag = (from: number) => { for (let t = from; t < n; t++) m[t] = Math.max(m[t], m[t - 1] - s); };
   lag(1);
-  const fix = Math.min(r.fixYears, n);
+  const fix = Math.min(Math.max(1, r.fixYears), n);
   const level0 = Math.max(...m.slice(0, fix));
   for (let t = 0; t < fix; t++) m[t] = level0;
   lag(fix);
-  if (r.growthEndIndex !== undefined) for (let t = Math.max(1, r.growthEndIndex + 1); t < n; t++) m[t] = Math.min(m[t], m[t - 1]);
-  const lo = Math.max(level0 * r.minRatio, r.floor ?? 0);
+  noGrowthAfterEnd();
   return m.map((v) => Math.round(Math.min(r.maxMultiple, Math.max(lo, v)) * 1e4) / 1e4);
 }
