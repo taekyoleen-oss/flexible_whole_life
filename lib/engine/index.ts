@@ -8,6 +8,7 @@ export { compute, type EngineResult } from "./compute";
 export { ASSUMPTIONS, getAssumption } from "./assumptions";
 export { PRESETS, buildPreset, FIX_YEARS, type PresetId, type PresetContext } from "./presets";
 export { validate, DEFAULT_ENVELOPE, type EnvelopeParams, type EnvelopeContext, type Violation } from "./envelope";
-export { needs, annuity, recommendPreset, type NeedsInput, type NeedsResult } from "./needs";
+export { needs, annuity, recommendPreset, childNeedCurve, debtNeedCurve, retireNeed, groupGapRatio, estateTaxCurve, type NeedsInput, type NeedsResult } from "./needs";
+export { remainingPrincipal, lifeExpectancy, inheritanceTax, regularizeShape, INHERITANCE_BRACKETS, type DebtMethod, type ShapeRules } from "./finance";
 export { compareAtBudget, type CompareRow, type CompareId } from "./compare";
 export { redesign, pvUnit, noAcquisition, type RedesignInput, type RedesignResult } from "./redesign";

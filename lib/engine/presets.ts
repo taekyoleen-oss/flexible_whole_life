@@ -1,4 +1,5 @@
 import { toBlocks } from "./schedule";
+import { regularizeShape } from "./finance";
 import type { Block } from "./types";
 
 export const FIX_YEARS = 5;
@@ -12,6 +13,7 @@ export interface PresetContext {
   groupCoverEndAge?: number;  // 단체보험 만기 나이, 기본 60
   independenceAge?: number;   // 기본 25
   growthEndAge?: number;      // E03, 기본 70
+  targets?: Partial<Record<PresetId, { target: number[]; floor?: number }>>;   // 조건 반영: 필요액 곡선을 배수로 정규화한 목표(길이 n). 있으면 표준 모양 대신 규칙에 맞춰 그린다
 }
 
 export const PRESETS: Record<PresetId, { label: string; description: string }> = {
@@ -26,6 +28,10 @@ export const PRESETS: Record<PresetId, { label: string; description: string }> =
 function multiples(id: PresetId, c: PresetContext): number[] {
   const n = c.n, S = new Array<number>(n).fill(1);
   const retire = c.retirementAge ?? 65, groupEnd = c.groupCoverEndAge ?? 60, indep = c.independenceAge ?? 25, growthEnd = c.growthEndAge ?? 70;
+  const tg = c.targets?.[id];
+  if (tg && tg.target.length === n) {
+    return regularizeShape(tg.target, { fixYears: FIX_YEARS, step: 0.1, maxMultiple: 3, minRatio: 0.2, floor: tg.floor, growthEndIndex: growthEnd - c.age });
+  }
   switch (id) {
     case "level": return S;
     case "child": {

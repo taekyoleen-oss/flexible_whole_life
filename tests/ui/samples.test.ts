@@ -17,9 +17,12 @@ describe("샘플 설계 3종", () => {
     }
   });
   it("샘플 프로필이 프리셋 경계를 만든다", () => {
-    const child = buildSample(SAMPLES[0]);
-    expect(child.blocks[0]).toMatchObject({ fromAge: 35, toAge: 51, multiple: 1 }); // 막내 2세 → 25세 = 23년 후 0.3, 그 6년 전(17년 후)부터 감액
-    const debt = buildSample(SAMPLES[1]);
-    expect(debt.blocks.at(-1)).toMatchObject({ multiple: 0.3, toAge: 111 });
+    const child = buildSample(SAMPLES[0]);   // 조건 반영: 필요액 곡선(35세, 막내 2세, 연소득 7천만)
+    expect(child.blocks[0]).toMatchObject({ fromAge: 35, toAge: 39, multiple: 1 });   // 초기 5년 고정
+    expect(child.blocks.at(-1)!.multiple).toBeLessThan(0.3);                            // 독립 뒤 정리자금만
+    const debt = buildSample(SAMPLES[1]);   // 부채 3억·15년 원리금균등 곡선
+    expect(debt.blocks[0].multiple).toBe(1);
+    expect(debt.blocks.at(-1)).toMatchObject({ toAge: 111 });
+    expect(debt.blocks.at(-1)!.multiple).toBeLessThan(0.3);
   });
 });

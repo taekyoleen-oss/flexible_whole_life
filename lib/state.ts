@@ -1,6 +1,8 @@
 import kli7 from "@/lib/engine/data/rates-kli7.json";
-import { ASSUMPTIONS, buildPreset, compute, DEFAULT_ENVELOPE, expandBlocks, getAssumption, toBlocks, type AssumptionSet, type Block, type EngineInput, type EngineResult, type EnvelopeParams, type PresetContext, type PresetId, type RateTable, type Sex } from "@/lib/engine";
-import { clamp } from "./format";
+import { ASSUMPTIONS, buildPreset, compute, DEFAULT_ENVELOPE, expandBlocks, getAssumption, toBlocks, type AssumptionSet, type Block, type DebtMethod, type EngineInput, type EngineResult, type EnvelopeParams, type PresetContext, type PresetId, type RateTable, type Sex } from "@/lib/engine";
+import { clamp, roundS0, S0_MAX, S0_MIN, S0_UNIT } from "./format";
+import { presetNeeds } from "./preset-needs";
+export { roundS0, S0_MAX, S0_MIN, S0_UNIT };
 
 export const TABLE = kli7 as RateTable;
 export const ASSUMPTION_ID = "default-2026";
@@ -57,6 +59,14 @@ export interface Profile {
   childrenAges: number[]; hasSpouse: boolean;
   income: number; liquidAssets: number; debt: number; debtYears: number; retirementAge: number;
   groupCover: number; groupCoverEndAge: number; termCover: number; termCoverEndAge: number;
+  // 프리셋 조건(공통 프로필이라 어느 팝업에서 고쳐도 모두 반영)
+  spouseAge: number;         // 배우자 나이(은퇴증액형 기대여명)
+  livingMonthly: number;     // 은퇴 후 배우자 월 생활비(원)
+  retireAssets: number;      // 은퇴 자산: 연금·퇴직금 현가(원)
+  debtRate: number;          // 대출 금리(연)
+  debtMethod: DebtMethod;    // 상환방식
+  netAssets: number;         // 순자산(상속준비형)
+  assetGrowth: number;       // 자산 증가율(연)
 }
 
 export interface DesignState {
@@ -78,6 +88,7 @@ export const DEFAULT_PROFILE: Profile = {
   sex: "M", age: 40, childrenAges: [], hasSpouse: true,
   income: 6e7, liquidAssets: 3e7, debt: 0, debtYears: 10, retirementAge: 65,
   groupCover: 0, groupCoverEndAge: 60, termCover: 0, termCoverEndAge: 60,
+  spouseAge: 40, livingMonthly: 2.5e6, retireAssets: 0, debtRate: 0.05, debtMethod: "annuity", netAssets: 0, assetGrowth: 0.03,
 };
 
 export const omegaOf = (sex: Sex) => TABLE.meta.terminal[sex];
@@ -87,16 +98,25 @@ export const termOf = (p: Profile) => omegaOf(p.sex) - p.age;
 export const endAgeOf = (p: Profile) => omegaOf(p.sex) - 1;
 
 /** 입력 정보 중 설계에 반영한 항목. 기본은 모두 false — 프리셋은 표준 경계로 그린다 */
-export interface InfoApplied { child: boolean; debt: boolean; retire: boolean; income: boolean }   // retire: 은퇴시기(은퇴증액형·단체보험보완형 공유), income: 기준보험금을 연소득 기반(니즈·HLV)으로 정했는지
-export const NO_INFO: InfoApplied = { child: false, debt: false, retire: false, income: false };
+export interface InfoApplied { child: boolean; debt: boolean; retire: boolean; group: boolean; estate: boolean; income: boolean }   // 프리셋별 조건 반영. retire: 은퇴시기·은퇴 후 필요액(은퇴증액형, 단체보험보완형과 은퇴시기 공유), income: 기준보험금을 입력 기반으로 정했는지
+export const NO_INFO: InfoApplied = { child: false, debt: false, retire: false, group: false, estate: false, income: false };
+export const PRESET_FLAG: Partial<Record<PresetId, keyof InfoApplied>> = { child: "child", debt: "debt", retire: "retire", group: "group", estate: "estate", level: "income" };
 /** 표준 경계(가입 후 경과년 기준): 자녀 독립 20년 후(막내 5세 가정), 부채 만기 20년(5년 후부터 15년 감액), 단체보험 60세, 은퇴 65세 */
 export const STANDARD_BOUNDARY = { youngestChildAge: 5, debtYears: 20, retirementAge: 65 } as const;   // 단체보험 만기 = 은퇴시기
 
 /** 프리셋 경계. 반영 플래그가 켜진 항목만 프로필 값을 쓰고 나머지는 표준 경계 */
-export function presetContext(p: Profile, env: EnvelopeParams = DEFAULT_ENVELOPE, applied: InfoApplied = NO_INFO): PresetContext {
+export function presetContext(p: Profile, env: EnvelopeParams = DEFAULT_ENVELOPE, applied: InfoApplied = NO_INFO, assumption: AssumptionSet = DEFAULT_SETTINGS.assumption): PresetContext {
   const hasChild = p.childrenAges.length > 0;
+  const n = termOf(p);
+  // 조건 반영이 켜진 프리셋은 필요액 곡선(target)을 붙여 표준 모양 대신 규칙에 맞춰 그린다
+  const targets: PresetContext["targets"] = {};
+  for (const id of ["child", "debt", "retire", "group", "estate"] as const) {
+    if (!applied[id]) continue;
+    const r = presetNeeds(id, p, assumption, TABLE, n, env);
+    if (r?.available) targets[id] = { target: r.target, floor: r.floor };
+  }
   return {
-    age: p.age, n: termOf(p),
+    age: p.age, n, targets,
     youngestChildAge: applied.child && hasChild ? Math.min(...p.childrenAges) : STANDARD_BOUNDARY.youngestChildAge,
     debtYears: applied.debt && p.debt > 0 ? p.debtYears : STANDARD_BOUNDARY.debtYears,
     retirementAge: applied.retire ? p.retirementAge : STANDARD_BOUNDARY.retirementAge,
@@ -209,10 +229,6 @@ export function effective(r: EngineResult, payYears: number) {
   };
 }
 
-/** 기준보험금 단위. 1천만원 단위로만 잡아야 그래프 1칸(10%)이 100만원 단위가 된다 */
-export const S0_UNIT = 1e7;
-export const S0_MIN = 1e7, S0_MAX = 1e10;
-export const roundS0 = (S0: number) => clamp(Math.round(S0 / S0_UNIT) * S0_UNIT, S0_MIN, S0_MAX);
 /** 월 보험료(원) → 기준보험금(원). 가장 가까운 1천만원 단위로 맞춘다 */
 export const s0FromMonthly = (monthly: number, gross100k: number) => roundS0((monthly * 1e5) / gross100k);
 
@@ -248,6 +264,9 @@ function clampProfile(p: Profile): Profile {
     retirementAge: clamp(Math.round(p.retirementAge), 40, 80),
     groupCover: Math.max(0, p.groupCover), groupCoverEndAge: clamp(Math.round(p.groupCoverEndAge), 20, 80),
     termCover: Math.max(0, p.termCover), termCoverEndAge: clamp(Math.round(p.termCoverEndAge), 20, 100),
+    spouseAge: clamp(Math.round(Number(p.spouseAge) || p.age), 15, 90), livingMonthly: Math.max(0, Number(p.livingMonthly) || 0), retireAssets: Math.max(0, Number(p.retireAssets) || 0),
+    debtRate: clamp(Number(p.debtRate) || 0, 0, 0.3), debtMethod: p.debtMethod === "principal" || p.debtMethod === "bullet" ? p.debtMethod : "annuity",
+    netAssets: Math.max(0, Number(p.netAssets) || 0), assetGrowth: clamp(Number(p.assetGrowth) || 0, -0.1, 0.2),
   };
 }
 
@@ -303,7 +322,7 @@ export function reducer(s: DesignState, a: Action): DesignState {
       const S0 = roundS0(Number(merged.S0));
       const anchors = cleanAnchors(merged.anchors, profile, settings.envelope);
       const ia = (raw?.infoApplied ?? {}) as Partial<Record<keyof InfoApplied, unknown>>;
-      const infoApplied: InfoApplied = { child: ia.child === true, debt: ia.debt === true, retire: ia.retire === true, income: ia.income === true };
+      const infoApplied: InfoApplied = { child: ia.child === true, debt: ia.debt === true, retire: ia.retire === true, group: ia.group === true, estate: ia.estate === true, income: ia.income === true };
       merged.infoApplied = infoApplied;
       return { ...withBlocks({ ...merged, payYears, S0, anchors }, deathSegments(blocks), celebrations(blocks)), updatedAt: merged.updatedAt };
     }
@@ -311,19 +330,19 @@ export function reducer(s: DesignState, a: Action): DesignState {
     case "resetDesign": {
       // 입력·설정·계약 조건은 두고 설계만 1억·표준 평준형으로. 변경점·축하금·입력 반영도 지운다
       const next = { ...s, S0: 1e8, anchors: [], infoApplied: NO_INFO };
-      return withBlocks(next, buildPreset("level", presetContext(s.profile, envelopeOf(s), NO_INFO)), [], "level");
+      return withBlocks(next, buildPreset("level", presetContext(s.profile, envelopeOf(s), NO_INFO, assumptionOf(s))), [], "level");
     }
     case "profile": {
       const profile = clampProfile({ ...s.profile, ...a.patch });
       const next = { ...s, profile, anchors: cleanAnchors(s.anchors, profile, envelopeOf(s)) };
-      const deaths = s.presetId === "custom" ? deathSegments(s.blocks) : buildPreset(s.presetId, presetContext(profile, envelopeOf(s), s.infoApplied));
+      const deaths = s.presetId === "custom" ? deathSegments(s.blocks) : buildPreset(s.presetId, presetContext(profile, envelopeOf(s), s.infoApplied, assumptionOf(s)));
       return withBlocks(next, deaths, celebrations(s.blocks));
     }
     case "S0": return touch({ S0: a.exact ? clamp(Math.round(a.S0), 0, S0_MAX) : roundS0(a.S0), infoApplied: { ...s.infoApplied, income: false } });   // exact: 재설계처럼 예산이 정한 값. 손으로 바꾸면 연소득 반영 표시는 해제
     case "payYears": return touch({ payYears: clamp(Math.round(a.payYears), 1, termOf(s.profile)) });
     case "waiver": return touch({ waiver: a.on });
     case "lowSurrender": return touch({ lowSurrender: a.on });
-    case "preset": return withBlocks({ ...s, anchors: [] }, buildPreset(a.id, presetContext(s.profile, envelopeOf(s), s.infoApplied)), celebrations(s.blocks), a.id);
+    case "preset": return withBlocks({ ...s, anchors: [] }, buildPreset(a.id, presetContext(s.profile, envelopeOf(s), s.infoApplied, assumptionOf(s))), celebrations(s.blocks), a.id);
     case "applyInfo": {
       // 입력 정보 반영: 체크한 경계만 프로필 값으로, 선택하면 기준보험금·프리셋도 함께. 프리셋 상태면 다시 그린다
       const infoApplied: InfoApplied = { ...s.infoApplied, ...a.applied, income: a.S0 !== undefined ? true : (a.applied.income ?? s.infoApplied.income) };
@@ -331,7 +350,7 @@ export function reducer(s: DesignState, a: Action): DesignState {
       const S0 = a.S0 !== undefined ? roundS0(a.S0) : s.S0;
       const next = { ...s, infoApplied, S0 };
       if (presetId === "custom") return touch({ infoApplied, S0 });
-      return withBlocks({ ...next, anchors: [] }, buildPreset(presetId, presetContext(s.profile, envelopeOf(s), infoApplied)), celebrations(s.blocks), presetId);
+      return withBlocks({ ...next, anchors: [] }, buildPreset(presetId, presetContext(s.profile, envelopeOf(s), infoApplied, assumptionOf(s))), celebrations(s.blocks), presetId);
     }
     case "settings": {
       const merged = sanitizeSettings({ ...s.settings, ...a.patch });

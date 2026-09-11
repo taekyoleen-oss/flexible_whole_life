@@ -16,7 +16,7 @@ export const SAMPLES: Sample[] = [
 export function buildSample(s: Sample): DesignState {
   const base = initialState();
   const profile: Profile = { ...base.profile, ...s.profile };
-  const applied = { child: true, debt: true, retire: true, income: false };   // 샘플은 프로필을 반영한 모양을 보여준다
+  const applied = { child: true, debt: true, retire: false, group: false, estate: false, income: false };   // 샘플은 프로필을 반영한 모양을 보여준다
   const draft: DesignState = { ...base, profile, presetId: s.presetId, infoApplied: applied, blocks: buildPreset(s.presetId, presetContext(profile, base.settings.envelope, applied)) };
   // per100k는 S0에 의존하지 않으므로 draft의 S0 그대로 평가해 역산에 쓴다.
   const unit = evaluate(draft);

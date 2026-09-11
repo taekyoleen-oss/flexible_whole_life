@@ -89,16 +89,22 @@ describe("불러오기", () => {
 });
 
 describe("프리셋", () => {
-  it("자녀연령형: 기본은 표준 경계(20년 후 0.3), 입력 반영을 켜면 막내 3세 → 62세부터 0.3", () => {
+  it("자녀연령형: 기본은 표준 경계(20년 후 0.3), 조건 반영을 켜면 필요액 곡선(생활비 현가 + 교육비 + 정리자금)을 규칙에 맞춰 그린다", () => {
     let s = reducer(initialState(), { type: "profile", patch: { childrenAges: [3, 6] } });
     s = reducer(s, { type: "preset", id: "child" });
     expect(s.presetId).toBe("child");
     expect(levels(s).slice(13, 21)).toEqual([1, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3]);   // 표준: 20년 후(60세) 0.3, 그 6년 전부터 매년 0.1씩
     expect(presetContext(s.profile).youngestChildAge).toBe(5);
+    expect(presetContext(s.profile).targets).toEqual({});
     s = reducer(s, { type: "applyInfo", applied: { child: true } });
     expect(s.infoApplied.child).toBe(true);
-    expect(levels(s).slice(15, 23)).toEqual([1, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3]);   // 막내 3세: 22년 후(62세) 0.3
-    expect(presetContext(s.profile, undefined, s.infoApplied).youngestChildAge).toBe(3);
+    const L = levels(s), ctx = presetContext(s.profile, undefined, s.infoApplied);
+    expect(ctx.targets?.child?.target.length).toBe(termOf(s.profile));
+    expect(new Set(L.slice(0, 5)).size).toBe(1);                                   // 초기 5년 고정
+    for (let t = 1; t < L.length; t++) { expect(L[t]).toBeLessThanOrEqual(L[t - 1] + 1e-9); expect(L[t - 1] - L[t]).toBeLessThanOrEqual(0.1 + 1e-9); }   // 매년 최대 1칸씩만 감액
+    for (let t = 0; t < L.length; t++) expect(L[t]).toBeGreaterThanOrEqual(ctx.targets!.child!.target[t] - 5e-5);   // 보장이 필요액 아래로 가지 않는다(소수 4자리 반올림 허용)
+    expect(L[69]).toBeLessThan(0.3);                                                // 독립 뒤엔 정리자금(3천만)만 남아 표준(30%)보다 낮다
+    expect(L[69]).toBeGreaterThanOrEqual(0.2 * L[0]);                                // E05 하한
     s = reducer(s, { type: "applyInfo", applied: { child: false }, S0: 3e8, presetId: "level" });
     expect(s.S0).toBe(3e8); expect(s.presetId).toBe("level"); expect(s.infoApplied.child).toBe(false);
     expect(s.infoApplied.income).toBe(true);                       // 기준보험금을 반영하면 연소득 반영 표시
@@ -126,7 +132,11 @@ describe("프리셋", () => {
     s = reducer(s, { type: "addCelebration", age: 60 });
     s = reducer(s, { type: "profile", patch: { childrenAges: [1] } });
     expect(s.presetId).toBe("child");
-    expect(deathSegments(s.blocks)[0].toAge).toBe(57); // 막내 1세 → t=24에 0.3, 그 6년 전(t=18, 58세)부터 감액
+    expect(celebrations(s.blocks).length).toBe(1);
+    expect(levels(s)[40]).toBeLessThan(levels(s)[10]);   // 자녀를 넣자 곡선(감액)이 그려진다
+    const before = levels(s);
+    s = reducer(s, { type: "profile", patch: { income: 1.2e8 } });   // 공통 조건(연소득)을 바꾸면 곡선이 다시 계산된다
+    expect(levels(s)).not.toEqual(before);
   });
 });
 
