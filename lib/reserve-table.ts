@@ -32,6 +32,8 @@ export function reserveRows(s: DesignState, r: EngineResult): ReserveRow[] {
 }
 
 export const RESERVE_HEADERS = ["경과년", "연령", "사망보험금", "축하금", "납입누계", "적용준비금", "표준준비금", "해약환급금", "환급률(%)", "사업비(연)"] as const;
+/** 상품별 보험금 이름을 넣은 머리글(암보험: 암진단보험금) */
+export const reserveHeaders = (benefit: string) => RESERVE_HEADERS.map((h) => (h === "사망보험금" ? benefit : h));
 
 /** Excel에서 바로 열리도록 BOM 포함 CSV. 금액은 원 단위 정수, 환급률은 소수 1자리 % */
 export function reserveCsv(rows: ReserveRow[]): string {

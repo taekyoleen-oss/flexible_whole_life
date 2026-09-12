@@ -37,11 +37,12 @@ export interface Block { fromAge: number; toAge: number; multiple: number; kind:
 
 export interface AssumptionSet {
   id: string; version: string; label: string;
-  mortality: "kli7";
+  mortality: "kli7" | "cancer";   // cancer: 암발생률 단일탈퇴(사망 시 책임준비금 지급)
   interest: number; standardInterest: number;
   expenses: Expenses;
   waiver: boolean;
   lowSurrender: { ratio: number; premiumDiscount: number };  // 납입기간 중 환급금 비율, 보험료 인하율
+  waitFactor?: number;   // 면책계수: 첫해 급부 배율(암 90일 면책 → 3/4). 없으면 1
   needs: { discount: number; livingRatio: number; selfRatio: number; educationPerChild: number; finalExpense: number; independenceAge: number; retirementAge: number };
 }
 
@@ -51,5 +52,6 @@ export interface EngineInput {
   blocks: Block[];
   waiver?: boolean;           // 미지정 시 가정 세트 값
   lowSurrender?: boolean;
-  termYears?: number;         // 미지정 시 ω − age (종신)
+  termYears?: number;         // 미지정 시 ω − age (종신). 암보험 표는 ω = 100 → 100세 만기
+  waitFactor?: number;        // 첫해 급부 배율(면책). 미지정 시 가정 세트 값
 }

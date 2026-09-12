@@ -1,7 +1,7 @@
 import type { PresetId } from "@/lib/engine";
 import { won } from "./format";
 import { presetNeeds, type PresetNeeds } from "./preset-needs";
-import { assumptionOf, envelopeOf, PRESET_FLAG, STANDARD_BOUNDARY, TABLE, termOf, type DesignState, type InfoApplied } from "./state";
+import { assumptionOf, envelopeOf, PRESET_FLAG, STANDARD_BOUNDARY, tableOf, termOf, type DesignState, type InfoApplied } from "./state";
 
 export const RETIRE_OPTIONS = [55, 60, 65, 70] as const;
 
@@ -64,7 +64,7 @@ export function boundaryLabel(key: keyof InfoApplied, s: DesignState): { text: s
 
 /** 현재 프로필·가정으로 계산한 프리셋 근거 수치(입력·근거 팝업용) */
 export function presetEvidence(id: PresetId, s: DesignState): PresetNeeds | null {
-  return presetNeeds(id, s.profile, assumptionOf(s), TABLE, termOf(s.profile), envelopeOf(s));
+  return presetNeeds(id, s.profile, assumptionOf(s), tableOf(s.profile), termOf(s.profile), envelopeOf(s));
 }
 
 export const flagOf = (id: PresetId) => PRESET_FLAG[id]!;

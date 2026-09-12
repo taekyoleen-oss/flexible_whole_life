@@ -4,7 +4,7 @@ import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, X
 import { useDesign } from "@/components/design-provider";
 import { compareAtBudget, type CompareRow } from "@/lib/engine";
 import { pct, won, wonShort } from "@/lib/format";
-import { assumptionOf, TABLE } from "@/lib/state";
+import { assumptionOf, tableOf } from "@/lib/state";
 
 const COLORS: Record<CompareRow["id"], string> = { level: "#94a3b8", combo: "#4a90c2", designed: "#1b2845" };
 
@@ -12,7 +12,7 @@ const COLORS: Record<CompareRow["id"], string> = { level: "#94a3b8", combo: "#4a
 export function useCompareRows(): { budget: number; rows: CompareRow[] } {
   const { state, result } = useDesign();
   const budget = result.monthly.gross;
-  const rows = compareAtBudget(budget, { sex: state.profile.sex, age: state.profile.age, payYears: state.payYears, blocks: state.blocks, waiver: state.waiver, lowSurrender: false }, assumptionOf(state), TABLE);
+  const rows = compareAtBudget(budget, { sex: state.profile.sex, age: state.profile.age, payYears: state.payYears, blocks: state.blocks, waiver: state.waiver, lowSurrender: false }, assumptionOf(state), tableOf(state.profile), state.profile.product);
   return { budget, rows };
 }
 

@@ -36,7 +36,9 @@ export function ContractFields() {
           {PAY_YEARS.map((y) => <option key={y} value={y}>{y}년납</option>)}
         </Select>
       </Field>
-      <label className="flex items-center gap-2 text-sm"><input type="checkbox" className="accent-sky" checked={state.waiver} onChange={(e) => dispatch({ type: "waiver", on: e.target.checked })} />납입면제 (사망·장해 50% 이중탈퇴)</label>
+      {state.profile.product === "cancer"
+        ? <p className="text-xs text-navy/60">암보험: 100세 만기 · 암진단 시 보험금 지급, 사망 시 책임준비금 지급 · 90일 면책(첫해 급부 3/4)</p>
+        : <label className="flex items-center gap-2 text-sm"><input type="checkbox" className="accent-sky" checked={state.waiver} onChange={(e) => dispatch({ type: "waiver", on: e.target.checked })} />납입면제 (사망·장해 50% 이중탈퇴)</label>}
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" className="accent-sky" checked={state.lowSurrender} onChange={(e) => dispatch({ type: "lowSurrender", on: e.target.checked })} />저해지 (납입기간 중 해약환급금 30% · 보험료 20% 인하)</label>
     </div>
   );

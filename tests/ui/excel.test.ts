@@ -14,7 +14,7 @@ describe("Excel 검산 워크북", () => {
     expect(k).toHaveLength(r.n + 1);
     expect(k[0].lx).toBe(100000);
     const sch = XLSX.utils.sheet_to_json<Record<string, number>>(wb.Sheets[SHEETS[5]]);
-    expect(sch[10]["S_t (사망 배수)"]).toBe(1.5);
+    expect(sch[10]["S_t (배수)"]).toBe(1.5);
     expect(sch[25]["C_t (축하금 배수)"]).toBe(0.15);
   });
   it("보험료 시트: 엔진 값과 검산 수식이 함께 들어 있다", () => {
@@ -27,7 +27,7 @@ describe("Excel 검산 워크북", () => {
     const k = XLSX.utils.sheet_to_json<Record<string, number>>(wb.Sheets[SHEETS[1]]);
     const sch = XLSX.utils.sheet_to_json<Record<string, number>>(wb.Sheets[SHEETS[5]]);
     let pvb = 0;
-    for (let t = 0; t < r.n; t++) pvb += sch[t]["S_t (사망 배수)"] * k[t].Cx;
+    for (let t = 0; t < r.n; t++) pvb += sch[t]["S_t (배수)"] * k[t].Cx;
     for (let t = 0; t <= r.n; t++) pvb += (sch[t]["C_t (축하금 배수)"] ?? 0) * k[t].Dx;
     expect(pvb).toBeCloseTo(r.perUnit.pvb, 6);
     const m = s.payYears;

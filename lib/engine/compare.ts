@@ -11,7 +11,8 @@ export interface CompareRow {
 }
 
 /** 같은 월 예산에서 평준형 종신 / 정기+종신 조합 / 설계형의 초기 보험금을 역산해 비교한다. */
-export function compareAtBudget(budget: number, base: Omit<EngineInput, "S0">, a: AssumptionSet, table: RateTable): CompareRow[] {
+export function compareAtBudget(budget: number, base: Omit<EngineInput, "S0">, a: AssumptionSet, table: RateTable, product: "whole" | "cancer" = "whole"): CompareRow[] {
+  const pname = product === "cancer" ? "암보험" : "종신";
   const omega = table.meta.terminal[base.sex];
   const n = base.termYears ?? omega - base.age;
   const unit = { ...base, S0: 1e5 };
@@ -36,9 +37,9 @@ export function compareAtBudget(budget: number, base: Omit<EngineInput, "S0">, a
   const levelS0 = (budget * 1e5) / levelU.per100k.gross;
   const designedS0 = (budget * 1e5) / designedU.per100k.gross;
   const rows: CompareRow[] = [];
-  rows.push(finish("level", "평준형 종신", compute({ ...base, S0: levelS0, blocks: levelBlocks }, a, table), levelS0));
+  rows.push(finish("level", `평준형 ${pname}`, compute({ ...base, S0: levelS0, blocks: levelBlocks }, a, table), levelS0));
 
-  if (termYears > 0 && termMult > 0) {
+  if (product !== "cancer" && termYears > 0 && termMult > 0) {
     const termBlocks = [{ fromAge: base.age, toAge: base.age + termYears - 1, multiple: 1, kind: "death" as const }];
     const termPay = Math.min(base.payYears, termYears);
     const termU = compute({ ...unit, termYears, payYears: termPay, blocks: termBlocks }, a, table);
@@ -46,9 +47,9 @@ export function compareAtBudget(budget: number, base: Omit<EngineInput, "S0">, a
     const whole = compute({ ...base, S0: S0 * wholeMult, blocks: levelBlocks }, a, table);
     const term = compute({ ...base, S0: S0 * termMult, termYears, payYears: termPay, blocks: termBlocks }, a, table);
     rows.push(finish("combo", "정기 + 종신 조합", whole, S0, term));
-  } else {
+  } else if (product !== "cancer") {
     rows.push({ ...rows[0], id: "combo", label: "정기 + 종신 조합 (감액 없음 → 평준형과 동일)" });
   }
-  rows.push(finish("designed", "설계형 종신", compute({ ...base, S0: designedS0 }, a, table), designedS0));
+  rows.push(finish("designed", `설계형 ${pname}`, compute({ ...base, S0: designedS0 }, a, table), designedS0));
   return rows;
 }

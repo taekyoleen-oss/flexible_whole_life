@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { useDesign } from "@/components/design-provider";
 import { Button, Card, onBackdropClick } from "@/components/ui";
 import { won } from "@/lib/format";
-import { STEP } from "@/lib/state";
+import { BENEFIT_LABEL, STEP } from "@/lib/state";
 import { BudgetFields } from "./budget-panel";
 import { AddonsPanel } from "./addons-panel";
 import { CelebrationBar } from "./celebration-bar";
@@ -27,7 +27,7 @@ export function ScheduleChart() {
   const dlg = useRef<HTMLDialogElement>(null);
   const toggle = <Button onClick={() => setAmount(!amount)}>{amount ? "배수로 보기" : "금액으로 보기"}</Button>;
   return (
-    <Card title="보험금 스케줄">
+    <Card title={`${BENEFIT_LABEL[state.profile.product]} 스케줄`}>
       <div className="-mt-2 mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-navy/60">
         <span>선을 누른 채 위아래로 드래그(↑↓ 키도 가능) · 1칸 = 기준보험금의 {STEP * 100}% ({won(STEP * state.S0)}) · 더블클릭 = 그 값으로 이후 평탄화 · 규칙은 [설계 규칙] <FormulaHelp id="step" /></span>
         <span className="flex gap-2"><RulesButton />{toggle}<Button onClick={() => dlg.current?.showModal()}>확대</Button></span>

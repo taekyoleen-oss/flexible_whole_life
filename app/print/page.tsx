@@ -6,7 +6,7 @@ import { useDesign } from "@/components/design-provider";
 import { ResultChart } from "@/components/result/result-chart";
 import { Button } from "@/components/ui";
 import { manwon, pct, won } from "@/lib/format";
-import { celebrations, effective } from "@/lib/state";
+import { celebrations, effective, PRODUCT_LABEL } from "@/lib/state";
 
 const YEARS = [1, 2, 3, 5, 10, 15, 20, 30];
 const Row = ({ k, v }: { k: string; v: string }) => <><dt className="text-navy/60">{k}</dt><dd className="text-right font-mono">{v}</dd></>;
@@ -27,7 +27,7 @@ export default function PrintPage() {
       </div>
 
       <section className="print-page space-y-3">
-        <h1 className="font-display text-2xl text-navy">설계형 종신보험 제안서</h1>
+        <h1 className="font-display text-2xl text-navy">{PRODUCT_LABEL[p.product]} 제안서</h1>
         <p className="text-navy/70">{today} · 피보험자 {p.age}세 {p.sex === "M" ? "남" : "여"} · 기준보험금 {won(state.S0)} · {state.payYears}년납 월납{state.waiver ? " · 납입면제" : ""}{state.lowSurrender ? " · 저해지" : ""}</p>
         <ScheduleEditor height={300} amount readOnly />
         {cels.length > 0 && <p className="text-xs text-navy/60">축하금: {cels.map((c) => `${c.fromAge}세 ${won(c.multiple * state.S0)}`).join(" · ")}</p>}

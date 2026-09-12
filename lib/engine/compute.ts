@@ -36,7 +36,10 @@ export function compute(input: EngineInput, a: AssumptionSet, table: RateTable):
   const waiver = input.waiver ?? a.waiver;
   const useLow = input.lowSurrender ?? false;
   const zero = new Array<number>(rs.q.length).fill(0);
-  const { S, C } = expandBlocks(input.blocks, input.age, n);
+  const { S: S_, C } = expandBlocks(input.blocks, input.age, n);
+  // 면책(암 90일 등): 첫해 급부만 waitFactor 배로 산출한다. 표시용 S는 그대로
+  const wait = input.waitFactor ?? a.waitFactor ?? 1;
+  const S = wait === 1 ? S_ : S_.map((v, t) => (t === 0 ? v * wait : v));
   const c: Contract = { age: input.age, termYears: n, payYears: input.payYears, freq, S, C };
   const e = scaleAlphaP(a.expenses, n);
 
@@ -62,7 +65,7 @@ export function compute(input: EngineInput, a: AssumptionSet, table: RateTable):
   expenseFlow[0] += p.alpha * input.S0;
 
   const result: EngineResult = {
-    n, omega, S, C, S0: input.S0, units,
+    n, omega, S: S_, C, S0: input.S0, units,
     perUnit: { ...p, alphaStd: ps.alpha },
     per100k,
     monthly: { net: per100k.net * units, gross: per100k.gross * units },

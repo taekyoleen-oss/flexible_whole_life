@@ -1,10 +1,18 @@
 import kli7 from "@/lib/engine/data/rates-kli7.json";
+import cancerRates from "@/lib/engine/data/rates-cancer.json";
 import { addonCurve, ASSUMPTIONS, buildPreset, mergeAddon, PRESETS, type Addon, type MergeRecord, compute, DEFAULT_ENVELOPE, expandBlocks, getAssumption, toBlocks, type AssumptionSet, type Block, type DebtMethod, type EngineInput, type EngineResult, type EnvelopeParams, type PresetContext, type PresetId, type RateTable, type Sex } from "@/lib/engine";
 import { clamp, roundS0, S0_MAX, S0_MIN, S0_UNIT } from "./format";
 import { presetNeeds } from "./preset-needs";
 export { roundS0, S0_MAX, S0_MIN, S0_UNIT };
 
 export const TABLE = kli7 as RateTable;
+export const CANCER_TABLE = cancerRates as RateTable;
+/** 상품: 종신보험(사망보험금, ω세 종신) · 암보험(암진단보험금, 100세 만기, 사망 시 책임준비금 지급) */
+export type Product = "whole" | "cancer";
+export const PRODUCT_LABEL: Record<Product, string> = { whole: "설계형 종신보험", cancer: "설계형 암보험" };
+export const BENEFIT_LABEL: Record<Product, string> = { whole: "사망보험금", cancer: "암진단보험금" };
+export const CANCER_ASSUMPTION_ID = "cancer-2026";
+export const tableOf = (p: { product?: Product }): RateTable => (p.product === "cancer" ? CANCER_TABLE : TABLE);
 export const ASSUMPTION_ID = "default-2026";
 export const STORAGE_KEY = "fwl:design:v1";
 
@@ -61,6 +69,7 @@ export function customize(a: AssumptionSet, baseId: string): AssumptionSet {
 }
 
 export interface Profile {
+  product: Product;      // 종신보험 | 암보험
   sex: Sex; age: number;
   childrenAges: number[]; hasSpouse: boolean;
   income: number; liquidAssets: number; debt: number; debtYears: number; retirementAge: number;
@@ -93,17 +102,17 @@ export interface DesignState {
 }
 
 export const DEFAULT_PROFILE: Profile = {
-  sex: "M", age: 40, childrenAges: [], hasSpouse: true,
+  product: "whole", sex: "M", age: 40, childrenAges: [], hasSpouse: true,
   income: 6e7, liquidAssets: 3e7, debt: 0, debtYears: 10, retirementAge: 65,
   groupCover: 0, groupCoverEndAge: 60, termCover: 0, termCoverEndAge: 60,
   spouseAge: 40, livingMonthly: 2.5e6, retireAssets: 0, debtRate: 0.05, debtMethod: "annuity", netAssets: 0, assetGrowth: 0.03,
 };
 
-export const omegaOf = (sex: Sex) => TABLE.meta.terminal[sex];
+export const omegaOf = (sex: Sex, product: Product = "whole") => tableOf({ product }).meta.terminal[sex];
 /** n = ω − x (종신) */
-export const termOf = (p: Profile) => omegaOf(p.sex) - p.age;
+export const termOf = (p: Profile) => omegaOf(p.sex, p.product) - p.age;
 /** 마지막 사망보장 연령 = ω − 1 */
-export const endAgeOf = (p: Profile) => omegaOf(p.sex) - 1;
+export const endAgeOf = (p: Profile) => omegaOf(p.sex, p.product) - 1;
 
 /** 입력 정보 중 설계에 반영한 항목. 기본은 모두 false — 프리셋은 표준 경계로 그린다 */
 export interface InfoApplied { child: boolean; debt: boolean; retire: boolean; group: boolean; estate: boolean; income: boolean }   // 프리셋별 조건 반영. retire: 은퇴시기·은퇴 후 필요액(은퇴증액형, 단체보험보완형과 은퇴시기 공유), income: 기준보험금을 입력 기반으로 정했는지
@@ -120,7 +129,7 @@ export function presetContext(p: Profile, env: EnvelopeParams = DEFAULT_ENVELOPE
   const targets: PresetContext["targets"] = {};
   for (const id of ["child", "debt", "retire", "group", "estate"] as const) {
     if (!applied[id]) continue;
-    const r = presetNeeds(id, p, assumption, TABLE, n, env, { retirementAge: applied.retire ? p.retirementAge : STANDARD_BOUNDARY.retirementAge });
+    const r = presetNeeds(id, p, assumption, tableOf(p), n, env, { retirementAge: applied.retire ? p.retirementAge : STANDARD_BOUNDARY.retirementAge });
     if (r?.available) targets[id] = { target: r.target, floor: r.floor };
   }
   return {
@@ -146,7 +155,7 @@ export function toEngineInput(s: DesignState): EngineInput {
 }
 
 /** 현재 가정 세트·위험률표로 설계 상태를 산출한다 */
-export const evaluate = (s: DesignState): EngineResult => compute(toEngineInput(s), assumptionOf(s), TABLE);
+export const evaluate = (s: DesignState): EngineResult => compute(toEngineInput(s), assumptionOf(s), tableOf(s.profile));
 
 export const STEP = 0.1;               // 그래프 1칸 = 기준보험금의 10%
 export const CELEBRATION_RATIO = 0.1;  // 축하금 = 해당 연령 사망보험금의 10%
@@ -285,6 +294,7 @@ export function normalizeSegments(segs: Block[], age: number, endAge: number): B
 function clampProfile(p: Profile): Profile {
   return {
     ...p,
+    product: p.product === "cancer" ? "cancer" : "whole",
     sex: p.sex === "F" ? "F" : "M",
     age: clamp(Math.round(p.age), 15, 70),
     childrenAges: (Array.isArray(p.childrenAges) ? p.childrenAges : [])
@@ -321,7 +331,7 @@ export type AutoFixCode = "E01" | "E04" | "E05";
 
 export type Action =
   | { type: "load"; state: DesignState }
-  | { type: "reset" }
+  | { type: "reset"; product?: Product }   // 새 설계: 상품을 고르면 그 상품의 가정 세트로 시작
   | { type: "profile"; patch: Partial<Profile> }
   | { type: "S0"; S0: number; exact?: boolean }
   | { type: "payYears"; payYears: number }
@@ -364,7 +374,14 @@ export function reducer(s: DesignState, a: Action): DesignState {
       merged.addons = sanitizeAddons(raw?.addons);
       return { ...withBlocks({ ...merged, payYears, S0, anchors }, deathSegments(blocks), celebrations(blocks)), updatedAt: merged.updatedAt };
     }
-    case "reset": return { ...initialState(), settings: s.settings };
+    case "reset": {
+      const product: Product = a.product ?? s.profile.product;
+      const base = initialState();
+      const profile = { ...base.profile, product };
+      const assumption = product === "cancer" ? getAssumption(CANCER_ASSUMPTION_ID) : (s.settings.assumption.mortality === "cancer" ? DEFAULT_SETTINGS.assumption : s.settings.assumption);
+      const settings = { ...s.settings, assumption };
+      return withBlocks({ ...base, profile, settings, waiver: product === "cancer" ? false : base.waiver }, buildPreset("level", presetContext(profile, settings.envelope, NO_INFO, assumption)), [], "level");
+    }
     case "resetDesign": {
       // 입력·설정·계약 조건은 두고 설계만 1억·표준 평준형으로. 변경점·축하금·입력 반영도 지운다
       const next = { ...s, S0: 1e8, anchors: [], infoApplied: NO_INFO, basePresetId: "level" as const, addons: [] };
@@ -375,7 +392,7 @@ export function reducer(s: DesignState, a: Action): DesignState {
       // 조건이 사라진 프리셋(부채 0, 자녀 없음 등)은 반영 표시를 끈다 — 체크된 채 표준 모양으로 조용히 돌아가지 않게
       const infoApplied = { ...s.infoApplied };
       for (const id of ["child", "debt", "group", "estate"] as const) {
-        if (infoApplied[id] && !presetNeeds(id, profile, assumptionOf(s), TABLE, termOf(profile), envelopeOf(s))?.available) infoApplied[id] = false;
+        if (infoApplied[id] && !presetNeeds(id, profile, assumptionOf(s), tableOf(profile), termOf(profile), envelopeOf(s))?.available) infoApplied[id] = false;
       }
       const next = { ...s, profile, infoApplied, anchors: cleanAnchors(s.anchors, profile, envelopeOf(s)) };
       const deaths = s.presetId === "custom" ? deathSegments(s.blocks) : buildPreset(s.presetId, presetContext(profile, envelopeOf(s), infoApplied, assumptionOf(s)));

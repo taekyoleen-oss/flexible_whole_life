@@ -1,7 +1,7 @@
 import * as XLSX from "xlsx";
 import { commutation, type EngineResult } from "@/lib/engine";
 import { reserveRows } from "./reserve-table";
-import { assumptionOf, celebrations, deathSegments, effective, TABLE, type DesignState } from "./state";
+import { assumptionOf, BENEFIT_LABEL, celebrations, deathSegments, effective, PRODUCT_LABEL, tableOf, type DesignState } from "./state";
 
 /**
  * 계리 검산용 워크북. 값은 엔진 산출값 그대로 넣고, 보험료 시트의 핵심 항목(PVB·N*·순보험료)은
@@ -29,7 +29,7 @@ function commutationSheet(sex: DesignState["profile"]["sex"], age: number, n: nu
 }
 
 export function buildWorkbook(s: DesignState, r: EngineResult): XLSX.WorkBook {
-  const a = assumptionOf(s), p = s.profile, rs = TABLE[p.sex];
+  const a = assumptionOf(s), p = s.profile, rs = tableOf(p)[p.sex];
   const eff = effective(r, s.payYears);
   const wb = XLSX.utils.book_new();
   const zero = new Array<number>(rs.q.length).fill(0);
@@ -41,7 +41,7 @@ export function buildWorkbook(s: DesignState, r: EngineResult): XLSX.WorkBook {
     : [["사업비 모형", "3이원 단순형"], ["α", exp.alpha], ["β", exp.beta], ["γ", exp.gamma]];
   const inputRows: Row[] = [
     ["항목", "값", "비고"],
-    ["작성 시각", new Date().toLocaleString("ko-KR"), "설계형 종신보험 앱 검산 파일"],
+    ["작성 시각", new Date().toLocaleString("ko-KR"), `${PRODUCT_LABEL[p.product]} 앱 검산 파일`],
     ["성별", p.sex === "M" ? "남" : "여"], ["가입연령", p.age], ["최종연령 ω", r.omega], ["보장기간 n", r.n],
     ["기준보험금 S0 (원)", s.S0], ["납입기간 m", s.payYears], ["납입 횟수/년", 12],
     ["납입면제", s.waiver], ["저해지", s.lowSurrender, s.lowSurrender ? `납입기간 중 환급금 ${a.lowSurrender.ratio * 100}% · 보험료 −${a.lowSurrender.premiumDiscount * 100}%` : ""],
@@ -49,7 +49,7 @@ export function buildWorkbook(s: DesignState, r: EngineResult): XLSX.WorkBook {
     [], ["가정 세트", a.id, a.label], ["버전", a.version], ["예정이율", a.interest], ["표준이율", a.standardInterest], ["위험률", "제7회 경험생명표 (kli7)"],
     ...expRows,
     [], ["설계 제약", ""], ...Object.entries(s.settings.envelope).map(([k, v]) => [k, v] as Row),
-    [], ["사망 구간 카드", "배수", "연령"], ...deathSegments(s.blocks).map((b) => [`${b.fromAge}~${b.toAge}세`, b.multiple] as Row),
+    [], [`${BENEFIT_LABEL[p.product]} 구간 카드`, "배수", "연령"], ...deathSegments(s.blocks).map((b) => [`${b.fromAge}~${b.toAge}세`, b.multiple] as Row),
     ["축하금", "배수", "연령"], ...celebrations(s.blocks).map((c) => [`${c.fromAge}세`, c.multiple] as Row),
   ];
   XLSX.utils.book_append_sheet(wb, kvSheet(inputRows), SHEETS[0]);
@@ -83,13 +83,13 @@ export function buildWorkbook(s: DesignState, r: EngineResult): XLSX.WorkBook {
 
   // 5. 준비금·환급금
   const rows = reserveRows(s, r);
-  const resRows: Row[] = [["경과년", "연령", "사망보험금", "축하금", "납입누계", "적용준비금", "표준준비금", "해약환급금", "환급률", "사업비(연)", "적용준비금(10만원당)", "표준준비금(10만원당)"]];
+  const resRows: Row[] = [["경과년", "연령", BENEFIT_LABEL[p.product], "축하금", "납입누계", "적용준비금", "표준준비금", "해약환급금", "환급률", "사업비(연)", "적용준비금(10만원당)", "표준준비금(10만원당)"]];
   for (const x of rows) resRows.push([x.t, x.age, x.benefit, x.celebration, x.paid, x.reserve, x.reserveStd, x.cash, x.rate, x.expense, r.reserve100k[x.t], r.reserveStd100k[x.t]]);
   const wsRes = XLSX.utils.aoa_to_sheet(resRows); wsRes["!cols"] = resRows[0].map(() => ({ wch: 16 }));
   XLSX.utils.book_append_sheet(wb, wsRes, SHEETS[4]);
 
   // 6. 설계 스케줄 (배수 벡터: 보험료 시트 수식이 참조)
-  const schRows: Row[] = [["t", "연령", "S_t (사망 배수)", "C_t (축하금 배수)", "사망보험금(원)", "축하금(원)"]];
+  const schRows: Row[] = [["t", "연령", "S_t (배수)", "C_t (축하금 배수)", `${BENEFIT_LABEL[p.product]}(원)`, "축하금(원)"]];
   for (let t = 0; t <= r.n; t++) schRows.push([t, p.age + t, t < r.n ? r.S[t] : null, r.C[t] ?? 0, t < r.n ? r.S[t] * s.S0 : null, (r.C[t] ?? 0) * s.S0]);
   const wsSch = XLSX.utils.aoa_to_sheet(schRows); wsSch["!cols"] = schRows[0].map(() => ({ wch: 16 }));
   XLSX.utils.book_append_sheet(wb, wsSch, SHEETS[5]);
