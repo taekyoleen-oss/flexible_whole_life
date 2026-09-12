@@ -1,6 +1,6 @@
 import kli7 from "@/lib/engine/data/rates-kli7.json";
 import cancerRates from "@/lib/engine/data/rates-cancer.json";
-import { addonCurve, ASSUMPTIONS, buildPreset, mergeAddon, PRESETS, type Addon, type MergeRecord, compute, DEFAULT_ENVELOPE, expandBlocks, getAssumption, toBlocks, type AssumptionSet, type Block, type DebtMethod, type EngineInput, type EngineResult, type EnvelopeParams, type PresetContext, type PresetId, type RateTable, type Sex } from "@/lib/engine";
+import { addonCurve, ASSUMPTIONS, buildPreset, mergeAddon, PRESETS, RIDERS, type Addon, type MergeRecord, type RiderId, compute, DEFAULT_ENVELOPE, expandBlocks, getAssumption, toBlocks, type AssumptionSet, type Block, type DebtMethod, type EngineInput, type EngineResult, type EnvelopeParams, type PresetContext, type PresetId, type RateTable, type Sex } from "@/lib/engine";
 import { clamp, roundS0, S0_MAX, S0_MIN, S0_UNIT } from "./format";
 import { presetNeeds } from "./preset-needs";
 export { roundS0, S0_MAX, S0_MIN, S0_UNIT };
@@ -98,6 +98,7 @@ export interface DesignState {
   settings: Settings;    // 가정 세트·설계 제약
   infoApplied: InfoApplied; // 입력 정보 중 프리셋 경계에 반영한 항목
   addons: Addon[];       // 추가 조건(옵션 레이어): 그래프에 별도 선, 결합하면 스케줄에 더해진다
+  riders: Record<RiderId, RiderState>;   // 특약: 부가 여부와 보장금액(1일당 금액). 기간은 주계약을 따른다
   updatedAt: number;     // 0이면 한 번도 편집하지 않은 기본 상태
 }
 
@@ -145,7 +146,7 @@ export function presetContext(p: Profile, env: EnvelopeParams = DEFAULT_ENVELOPE
 export function initialState(): DesignState {
   return {
     version: 1, profile: DEFAULT_PROFILE, S0: 1e8, payYears: 20, waiver: true, lowSurrender: false,
-    presetId: "level", blocks: buildPreset("level", presetContext(DEFAULT_PROFILE)), anchors: [], settings: DEFAULT_SETTINGS, infoApplied: NO_INFO, addons: [], updatedAt: 0,
+    presetId: "level", blocks: buildPreset("level", presetContext(DEFAULT_PROFILE)), anchors: [], settings: DEFAULT_SETTINGS, infoApplied: NO_INFO, addons: [], riders: defaultRiders(), updatedAt: 0,
   };
 }
 export const DEFAULT_STATE: DesignState = initialState();
@@ -182,6 +183,20 @@ export function canUnmerge(s: DesignState, add: Addon): boolean {
   if (!r || r.afterS0 !== s.S0) return false;
   const cur = levels(s);
   return cur.length === r.afterS.length && cur.every((v, i) => Math.abs(v - r.afterS[i]) < 1e-9);
+}
+
+/** 특약 상태: 기본은 모두 꺼짐, 금액은 특약 기본값(진단·수술 1천만, 암입원 1일 10만, 입원 1일 5만) */
+export interface RiderState { on: boolean; amount: number }
+export function defaultRiders(): Record<RiderId, RiderState> { return Object.fromEntries(RIDERS.map((r) => [r.id, { on: false, amount: r.defaultAmount }])) as Record<RiderId, RiderState>; }   // 함수 선언(호이스팅): DEFAULT_STATE가 모듈 로드 시 부른다
+export function sanitizeRiders(raw: unknown): Record<RiderId, RiderState> {
+  const out = defaultRiders();
+  const r = (raw ?? {}) as Partial<Record<RiderId, Partial<RiderState>>>;
+  for (const d of RIDERS) {
+    const v = r[d.id];
+    if (!v) continue;
+    out[d.id] = { on: v.on === true, amount: Number.isFinite(Number(v.amount)) && Number(v.amount) > 0 ? Number(v.amount) : d.defaultAmount };
+  }
+  return out;
 }
 
 /** 추가 조건 목록 정리(저장 파일·공유 링크에서 온 값 포함) */
@@ -346,6 +361,7 @@ export type Action =
   | { type: "removeCelebration"; index: number }
   | { type: "level"; age: number; multiple: number; base?: LevelBase }
   | { type: "flatten"; age: number }   // 더블클릭: A 이후를 A의 값으로 평탄화
+  | { type: "rider"; id: RiderId; patch: Partial<RiderState> }
   | { type: "addAddon"; addon: Addon }
   | { type: "removeAddon"; id: string }
   | { type: "mergeAddon"; id: string }   // 결합: 추가 조건을 스케줄에 더한다(되돌리기 정보를 보관)
@@ -372,6 +388,7 @@ export function reducer(s: DesignState, a: Action): DesignState {
       merged.infoApplied = infoApplied;
       merged.basePresetId = raw?.basePresetId && raw.basePresetId in PRESETS ? raw.basePresetId : merged.presetId !== "custom" ? merged.presetId : undefined;
       merged.addons = sanitizeAddons(raw?.addons);
+      merged.riders = sanitizeRiders(raw?.riders);
       return { ...withBlocks({ ...merged, payYears, S0, anchors }, deathSegments(blocks), celebrations(blocks)), updatedAt: merged.updatedAt };
     }
     case "reset": {
@@ -492,6 +509,12 @@ export function reducer(s: DesignState, a: Action): DesignState {
       const same = next.every((v, i) => v === cur[i]) && anchors.length === s.anchors.length && anchors.every((v, i) => v === s.anchors[i]);
       if (same) return s;
       return withBlocks({ ...s, anchors }, toBlocks(next, x), celebrations(s.blocks), "custom");
+    }
+    case "rider": {
+      const cur = s.riders[a.id];
+      const def = RIDERS.find((r) => r.id === a.id)!;
+      const amount = a.patch.amount !== undefined ? clamp(Math.round(a.patch.amount), def.kind === "daily" ? 1e4 : 1e6, def.kind === "daily" ? 1e6 : 5e8) : cur.amount;
+      return touch({ riders: { ...s.riders, [a.id]: { on: a.patch.on ?? cur.on, amount } } });
     }
     case "addAddon": {
       const [a1] = sanitizeAddons([a.addon]);

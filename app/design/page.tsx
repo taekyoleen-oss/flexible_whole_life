@@ -4,6 +4,7 @@ import { BlockCards } from "@/components/canvas/block-cards";
 import { BudgetPanel } from "@/components/canvas/budget-panel";
 import { DesignToolbar } from "@/components/canvas/design-toolbar";
 import { InputSummary } from "@/components/canvas/input-summary";
+import { RidersPanel } from "@/components/canvas/riders-panel";
 import { PresetPicker } from "@/components/canvas/preset-picker";
 import { ScheduleChart } from "@/components/canvas/schedule-chart";
 import { useDesign } from "@/components/design-provider";
@@ -29,7 +30,7 @@ export default function DesignPage() {
         {TABS.map((t) => <Button key={t} primary={tab === t} aria-pressed={tab === t} onClick={() => setTab(t)}>{t}</Button>)}
       </div>
       <div className="grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
-        {col("입력", <><InputSummary /><BudgetPanel /></>)}
+        {col("입력", <><InputSummary /><BudgetPanel /><RidersPanel /></>)}
         {col("설계", (
           <>
             <PresetPicker />

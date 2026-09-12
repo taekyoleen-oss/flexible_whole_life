@@ -1,5 +1,5 @@
 import { commutation, nStar, pvUnit, redesign, toBlocks, type Block, type RedesignInput, type RedesignResult, type Sex } from "@/lib/engine";
-import { assumptionOf, CELEBRATION_RATIO, celebrations, evaluate, initialState, levels, reducer, TABLE, tableOf, type DesignState, type Profile, type Settings } from "./state";
+import { assumptionOf, CELEBRATION_RATIO, celebrations, evaluate, initialState, levels, reducer, TABLE, type DesignState, type Profile, type Settings } from "./state";
 
 export interface OldContract {
   sex: Sex; entryAge: number; elapsed: number; attainedAge: number;

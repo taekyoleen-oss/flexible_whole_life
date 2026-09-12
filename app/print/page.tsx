@@ -7,6 +7,7 @@ import { ResultChart } from "@/components/result/result-chart";
 import { Button } from "@/components/ui";
 import { manwon, pct, won } from "@/lib/format";
 import { celebrations, effective, PRODUCT_LABEL } from "@/lib/state";
+import { riderPremiums, riderTotal } from "@/lib/riders";
 
 const YEARS = [1, 2, 3, 5, 10, 15, 20, 30];
 const Row = ({ k, v }: { k: string; v: string }) => <><dt className="text-navy/60">{k}</dt><dd className="text-right font-mono">{v}</dd></>;
@@ -16,6 +17,7 @@ export default function PrintPage() {
   const [withAgent, setWithAgent] = useState(true);
   if (!loaded) return null;
   const p = state.profile, eff = effective(r, state.payYears), a = state.settings.assumption, cels = celebrations(state.blocks);
+  const riderRows = riderPremiums(state).filter((x) => x.on);
   const today = new Date().toLocaleDateString("ko-KR");
   const loading: [string, number][] = [["신계약비 α", r.loading.alpha], ["유지비 정액 β_S", r.loading.betaS], ["납입 후 유지비 β′", r.loading.betaPrime], ["유지비율 β_G", r.loading.betaG], ["수금비 γ", r.loading.gamma]];
   return (
@@ -33,6 +35,8 @@ export default function PrintPage() {
         {cels.length > 0 && <p className="text-xs text-navy/60">축하금: {cels.map((c) => `${c.fromAge}세 ${won(c.multiple * state.S0)}`).join(" · ")}</p>}
         <dl className="grid grid-cols-[1fr_auto] gap-y-1">
           <Row k="월 보험료" v={won(eff.monthly)} />
+          {riderRows.map((x) => <Row key={x.id} k={`${x.label} · ${won(x.amount)}${x.kind === "daily" ? "/일" : ""}`} v={won(x.monthly)} />)}
+          {riderRows.length > 0 && <Row k={`최종 합계 (주계약 + 특약 ${riderRows.length}건)`} v={won(eff.monthly + riderTotal(riderRows))} />}
           <Row k="총 납입보험료" v={won(eff.totalPaid)} />
           <Row k="초기 보험금 / 최대 보험금" v={`${won(r.S[0] * state.S0)} / ${won(Math.max(...r.S) * state.S0)}`} />
           <Row k={`납입 완료(${state.payYears}년) 환급률`} v={pct(eff.rate[state.payYears])} />
