@@ -6,7 +6,7 @@ describe("브라우저 보관함", () => {
   const s = reducer(initialState(), { type: "level", age: 50, multiple: 1.5 });
   const entry = (name: string, savedAt: number): LibraryEntry => ({ id: `id-${name}`, name, savedAt, state: s });
   it("기본 이름은 나이·성별·프리셋·월 보험료", () => {
-    expect(autoName(initialState())).toMatch(/^40세 남 · 평준형 · 월 [\d,]+원$/);
+    expect(autoName(initialState())).toMatch(/^40세 남 · 평준형 · 월 [\d,.]+(천|백만)원$/);
     expect(autoName(s)).toContain("직접 설계");
   });
   it("같은 이름은 덮어쓰고 최신 순, 최대 건수 유지", () => {

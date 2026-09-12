@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { useDesign } from "@/components/design-provider";
-import { won } from "@/lib/format";
+import { won, wonShort } from "@/lib/format";
 import { allowedRange, celebrations, endAgeOf, envelopeOf, firstEditableAge, STEP, type LevelBase } from "@/lib/state";
 
 const M = { left: 64, right: 16, top: 18, bottom: 28 };
@@ -112,7 +112,7 @@ export function ScheduleEditor({ height, amount, readOnly = false }: { height: n
         ))}
         {gridLevels.filter((m) => Math.round(m * 10) % 5 === 0).map((m) => (
           <text key={m} x={M.left - 6} y={ys(m) + 4} fontSize={11} textAnchor="end" fill="#1b2845">
-            {amount ? `${Math.round((m * S0) / 1e4).toLocaleString()}만` : `${m}배`}
+            {amount ? wonShort(m * S0) : `${m}배`}
           </text>
         ))}
         {xTicks.map((a) => (

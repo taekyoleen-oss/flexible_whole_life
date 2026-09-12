@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { clamp, manwon, mult, pct, won } from "@/lib/format";
+import { clamp, manwon, mult, pct, won, wonExact } from "@/lib/format";
 
 describe("format", () => {
-  it("원·만원 천 단위 구분", () => {
-    expect(won(1234567.4)).toBe("1,234,567원");
-    expect(manwon(123456789)).toBe("12,346만원");
-    expect(won(0)).toBe("0원");
+  it("금액: 100만원 이상은 백만원(소수 1자리), 그 아래는 천원(소수 1자리 = 백원)", () => {
+    expect(won(1234567.4)).toBe("1.2백만원");
+    expect(won(100000000)).toBe("100백만원");
+    expect(won(283540)).toBe("283.5천원");
+    expect(manwon(123456789)).toBe("123.5백만원");
+    expect(won(0)).toBe("0천원");
+    expect(wonExact(1234567.4)).toBe("1,234,567원");
   });
   it("백분율·배수", () => {
     expect(pct(0.269)).toBe("26.9%");

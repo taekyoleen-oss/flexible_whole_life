@@ -1,4 +1,5 @@
 import type { PresetId } from "@/lib/engine";
+import { won } from "./format";
 import { presetNeeds, type PresetNeeds } from "./preset-needs";
 import { assumptionOf, envelopeOf, PRESET_FLAG, STANDARD_BOUNDARY, TABLE, termOf, type DesignState, type InfoApplied } from "./state";
 
@@ -53,11 +54,11 @@ export function boundaryLabel(key: keyof InfoApplied, s: DesignState): { text: s
   const youngest = p.childrenAges.length ? Math.min(...p.childrenAges) : null;
   switch (key) {
     case "child": return { available: youngest !== null && p.income > 0, text: youngest !== null ? `막내 ${youngest}세 → ${p.age + indep - youngest}세 독립 (표준 ${p.age + indep - STANDARD_BOUNDARY.youngestChildAge}세)` : "자녀 나이를 입력하세요" };
-    case "debt": return { available: p.debt > 0, text: p.debt > 0 ? `부채 ${Math.round(p.debt / 1e4).toLocaleString()}만원 · 만기 ${p.debtYears}년 → ${p.age + p.debtYears}세 (표준 ${p.age + STANDARD_BOUNDARY.debtYears}세)` : "부채 잔액·만기를 입력하세요" };
+    case "debt": return { available: p.debt > 0, text: p.debt > 0 ? `부채 ${won(p.debt)} · 만기 ${p.debtYears}년 → ${p.age + p.debtYears}세 (표준 ${p.age + STANDARD_BOUNDARY.debtYears}세)` : "부채 잔액·만기를 입력하세요" };
     case "retire": return { available: true, text: `은퇴시기 ${p.retirementAge}세 (표준 ${STANDARD_BOUNDARY.retirementAge}세)` };
-    case "group": return { available: p.groupCover > 0, text: p.groupCover > 0 ? `단체보험 ${Math.round(p.groupCover / 1e4).toLocaleString()}만원 · 퇴직 ${p.retirementAge}세` : "단체보험 보험금을 입력하세요" };
-    case "estate": return { available: p.netAssets > 0, text: p.netAssets > 0 ? `순자산 ${Math.round(p.netAssets / 1e4).toLocaleString()}만원 · 증가율 ${(p.assetGrowth * 100).toFixed(1)}%` : "순자산을 입력하세요" };
-    case "income": return { available: p.income > 0, text: p.income > 0 ? `연소득 ${Math.round(p.income / 1e4).toLocaleString()}만원 → 니즈 기준보험금 (표준 1억)` : "연소득을 입력하세요" };
+    case "group": return { available: p.groupCover > 0, text: p.groupCover > 0 ? `단체보험 ${won(p.groupCover)} · 퇴직 ${p.retirementAge}세` : "단체보험 보험금을 입력하세요" };
+    case "estate": return { available: p.netAssets > 0, text: p.netAssets > 0 ? `순자산 ${won(p.netAssets)} · 증가율 ${(p.assetGrowth * 100).toFixed(1)}%` : "순자산을 입력하세요" };
+    case "income": return { available: p.income > 0, text: p.income > 0 ? `연소득 ${won(p.income)} → 니즈 기준보험금 (표준 1억)` : "연소득을 입력하세요" };
   }
 }
 

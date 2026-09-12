@@ -1,4 +1,5 @@
 import { needs, PRESETS, recommendPreset, type NeedsResult, type PresetId } from "@/lib/engine";
+import { won } from "./format";
 import { assumptionOf, envelopeOf, roundS0, S0_MIN, type DesignState } from "./state";
 
 export interface Recommendation {
@@ -11,7 +12,7 @@ export interface Recommendation {
 
 const REASON: Record<PresetId, (s: DesignState) => string> = {
   child: (s) => `막내(${Math.min(...s.profile.childrenAges)}세)가 독립하는 ${assumptionOf(s).needs.independenceAge}세까지 보장을 높게 두고 이후 30%로 줄입니다`,
-  debt: (s) => `부채 ${Math.round(s.profile.debt / 1e4).toLocaleString()}만원을 만기 ${s.profile.debtYears}년에 맞춰 선형으로 줄입니다`,
+  debt: (s) => `부채 ${won(s.profile.debt)}을 만기 ${s.profile.debtYears}년에 맞춰 선형으로 줄입니다`,
   group: (s) => `퇴직(${s.profile.retirementAge}세) 전 5년간 매년 10%씩 100%로 올립니다`,
   estate: () => "50세 이상, 자녀 독립: 초기 50%에서 매년 10%씩 올려 상속 재원을 키웁니다",
   retire: (s) => `은퇴(${s.profile.retirementAge}세) 전 5년간 매년 10%씩 1.5배로 올립니다`,

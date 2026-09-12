@@ -3,7 +3,7 @@ import { FormulaHelp } from "@/components/formula-help";
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useDesign } from "@/components/design-provider";
 import { compareAtBudget, type CompareRow } from "@/lib/engine";
-import { pct, won } from "@/lib/format";
+import { pct, won, wonShort } from "@/lib/format";
 import { assumptionOf, TABLE } from "@/lib/state";
 
 const COLORS: Record<CompareRow["id"], string> = { level: "#94a3b8", combo: "#4a90c2", designed: "#1b2845" };
@@ -30,7 +30,7 @@ export function CompareTable({ chartWidth }: { chartWidth?: number }) {
     <LineChart data={data} width={chartWidth} height={260} margin={{ top: 8, right: 16, bottom: 8, left: 8 }}>
       <CartesianGrid stroke="#1b284518" />
       <XAxis dataKey="age" type="number" domain={["dataMin", "dataMax"]} unit="세" fontSize={11} tickCount={8} />
-      <YAxis width={64} fontSize={11} tickFormatter={(v: number) => `${Math.round(v / 1e4).toLocaleString()}만`} />
+      <YAxis width={64} fontSize={11} tickFormatter={(v: unknown) => wonShort(Number(v))} />
       <Tooltip labelFormatter={(a) => `${a}세`} formatter={(v) => (v == null ? null : won(Number(v)))} />
       <Legend />
       {rows.map((r) => <Line key={r.id} type="stepAfter" dataKey={r.id} name={r.label} stroke={COLORS[r.id]} strokeWidth={r.id === "designed" ? 2.5 : 1.5} dot={false} isAnimationActive={false} />)}
