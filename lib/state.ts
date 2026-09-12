@@ -373,10 +373,10 @@ export function reducer(s: DesignState, a: Action): DesignState {
     case "waiver": return touch({ waiver: a.on });
     case "lowSurrender": return touch({ lowSurrender: a.on });
     case "preset": {
-      // 카드 버튼은 항상 표준 모양(기준보험금 1억)으로 시작한다. 조건은 카드의 체크박스로 켠다
+      // 카드 버튼: 그 카드의 체크가 켜져 있으면 조건 반영 곡선, 꺼져 있으면 기준보험금 1억·표준 모양
       const flag = PRESET_FLAG[a.id];
-      const infoApplied = flag ? { ...s.infoApplied, [flag]: false } : s.infoApplied;
-      return withBlocks({ ...s, anchors: [], basePresetId: a.id, S0: 1e8, infoApplied }, buildPreset(a.id, presetContext(s.profile, envelopeOf(s), infoApplied, assumptionOf(s))), celebrations(s.blocks), a.id);
+      const on = flag ? s.infoApplied[flag] : false;
+      return withBlocks({ ...s, anchors: [], basePresetId: a.id, S0: on ? s.S0 : 1e8 }, buildPreset(a.id, presetContext(s.profile, envelopeOf(s), s.infoApplied, assumptionOf(s))), celebrations(s.blocks), a.id);
     }
     case "applyInfo": {
       // 입력 정보 반영: 체크한 경계만 프로필 값으로, 선택하면 기준보험금·프리셋도 함께. 프리셋 상태면 다시 그린다
