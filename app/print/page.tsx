@@ -41,7 +41,7 @@ export default function PrintPage() {
       </section>
 
       <section className="print-page space-y-3">
-        <h2 className="font-display text-xl text-navy">해약환급금과 비교</h2>
+        <h2 className="font-display text-xl text-navy">책임준비금·보험료 누계와 해약환급금</h2>
         <ResultChart width={680} />
         <table className="w-full text-xs"><thead><tr className="text-navy/60"><th className="text-left">경과</th><th className="text-right">납입 누계</th><th className="text-right">해약환급금</th><th className="text-right">환급률</th></tr></thead>
           <tbody>{YEARS.filter((t) => t <= r.n).map((t) => <tr key={t} className="border-t border-navy/10 font-mono"><td>{t}년</td><td className="text-right">{won(eff.paid[t])}</td><td className="text-right">{won(eff.cash[t])}</td><td className="text-right">{pct(eff.rate[t])}</td></tr>)}</tbody></table>
