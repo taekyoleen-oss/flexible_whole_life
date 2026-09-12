@@ -4,9 +4,11 @@ import { DEFAULT_ENVELOPE } from "@/lib/engine/envelope";
 import { canUnmerge, initialState, levels, reducer } from "@/lib/state";
 
 describe("추가 조건", () => {
-  it("자녀교육: 1인당 1억, 10세 → 독립(25세)까지 15년 동안 직선 감소", () => {
+  it("자녀교육: 1인당 1억, 10세 → 초기 5년 정액, 6~15년 직선 감소", () => {
     const c = addonCurve({ id: "a", kind: "education", amount: 1e8, years: 0, childAge: 10 }, 30);
-    expect(c[0]).toBe(1e8); expect(c[5]).toBeCloseTo(1e8 * (10 / 15), 6); expect(c[15]).toBe(0); expect(c[29]).toBe(0);
+    expect(c.slice(0, 6)).toEqual([1e8, 1e8, 1e8, 1e8, 1e8, 1e8]);   // 초기 5년 정액(6년째 시작점도 정액)
+    expect(c[10]).toBeCloseTo(1e8 * (5 / 10), 6); expect(c[15]).toBe(0); expect(c[29]).toBe(0);
+    expect(addonShape({ id: "a", kind: "education", amount: 1e8, years: 0, childAge: 10 })).toBe("1~5년 정액, 6~15년 감액");
   });
   it("대출상환: 1~5년 정액, 6년째부터 만기까지 직선 감액, 정액은 기간 동안 같은 금액", () => {
     const l = addonCurve({ id: "b", kind: "loan", amount: 3e8, years: 15 }, 30);

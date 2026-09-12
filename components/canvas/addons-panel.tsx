@@ -53,12 +53,12 @@ export function AddonsPanel() {
       )}
       <dialog ref={dlg} className="m-auto w-[min(92vw,520px)] whitespace-normal rounded-lg bg-white p-5 text-left shadow-xl backdrop:bg-navy/50" onClick={onBackdropClick}>
         <h3 className="font-display text-lg text-navy">추가 조건</h3>
-        <p className="mt-1 text-xs text-navy/60">자녀교육: 1인당 최초 금액이 독립({indep}세)까지 매년 줄어듭니다. 대출상환: 초기 {fix}년(E01 고정 구간)은 대출금 정액, {fix + 1}년째부터 만기까지 직선으로 줄어듭니다. 정액: 기간 동안 같은 금액.</p>
+        <p className="mt-1 text-xs text-navy/60">초기 {fix}년(E01 고정 구간)은 정액입니다. 자녀교육: 1인당 최초 금액이 {fix + 1}년째부터 독립({indep}세)까지 직선으로 줄어듭니다. 대출상환: 대출금이 {fix + 1}년째부터 만기까지 직선으로 줄어듭니다. 정액: 기간 동안 같은 금액.</p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <Field label="종류"><Select value={kind} onChange={(e) => setKind(e.target.value as AddonKind)}>{(Object.keys(ADDON_LABEL) as AddonKind[]).map((k) => <option key={k} value={k}>{ADDON_LABEL[k]}</option>)}</Select></Field>
           <Field label={kind === "education" ? "자녀 1인당 최초 금액" : kind === "loan" ? "대출금" : "보장 금액"}><MillionInput value={amount} onChange={setAmount} min={1} max={1e4} step={1} /></Field>
           {kind === "education"
-            ? <Field label="자녀 나이" hint={`독립까지 ${Math.max(0, indep - childAge)}년 동안 감소`}><div className="flex items-center gap-1"><NumInput value={childAge} min={0} max={indep} onCommit={(v) => setChildAge(Math.round(v))} /><span className="text-sm text-navy/60">세</span></div></Field>
+            ? <Field label="자녀 나이" hint={`1~${Math.min(fix, Math.max(0, indep - childAge))}년 정액${indep - childAge > fix ? `, ${fix + 1}~${indep - childAge}년 감액` : ""}`}><div className="flex items-center gap-1"><NumInput value={childAge} min={0} max={indep} onCommit={(v) => setChildAge(Math.round(v))} /><span className="text-sm text-navy/60">세</span></div></Field>
             : <Field label={kind === "loan" ? "상환기간 (년)" : "보장 기간 (년)"} hint={kind === "loan" ? `1~${Math.min(fix, years)}년 정액${years > fix ? `, ${fix + 1}~${years}년 감액` : ""}` : undefined}><NumInput value={years} min={1} max={60} onCommit={(v) => setYears(Math.round(v))} /></Field>}
         </div>
         <p className="mt-3 text-xs text-navy/60">{addonShape(draft, indep, fix)} · 미리보기: 지금 {won(preview[0])} → 5년 뒤 {won(preview[Math.min(5, result.n - 1)])} → 10년 뒤 {won(preview[Math.min(10, result.n - 1)])}</p>
