@@ -1,5 +1,5 @@
 "use client";
-import { Fragment, useRef, useState } from "react";
+import { Fragment, useRef, useState, type RefObject } from "react";
 import { useDesign } from "@/components/design-provider";
 import { FormulaHelp } from "@/components/formula-help";
 import { Button, Field, ManwonInput, onBackdropClick } from "@/components/ui";
@@ -12,9 +12,10 @@ import type { Profile } from "@/lib/state";
  * "재무정보·기준보험금" 버튼 + 팝업. 연소득·유동자산·기존 보장을 입력하면 니즈·HLV 기준보험금 후보가 계산되고,
  * 고른 금액과 추천 프리셋을 "적용"으로 설계에 반영한다. 설계는 1억으로 시작하므로 적용 전에는 연소득이 "미반영"이다.
  */
-export function FinanceButton({ compact = false }: { compact?: boolean }) {
+export function FinanceButton({ compact = false, dlgRef }: { compact?: boolean; dlgRef?: RefObject<HTMLDialogElement | null> }) {
   const { state, dispatch } = useDesign();
-  const dlg = useRef<HTMLDialogElement>(null);
+  const own = useRef<HTMLDialogElement>(null);
+  const dlg = dlgRef ?? own;
   const p = state.profile;
   const r = recommend(state);
   const d = r.needs.detail;
