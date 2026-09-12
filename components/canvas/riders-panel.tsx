@@ -14,7 +14,7 @@ export function RidersPanel() {
   const extra = riderTotal(rows);
   return (
     <Card title={<>특약 <FormulaHelp id="riders" /></>}>
-      <p className="mb-2 text-xs text-navy/60">주계약({PRODUCT_LABEL[state.profile.product]})에 붙는 정액 특약입니다. 보험기간·납입기간은 주계약과 같고, 보장금액을 바꾸면 보험료가 바로 계산됩니다.</p>
+      <p className="mb-2 text-xs text-navy/60">주계약({PRODUCT_LABEL[state.profile.product]})에 붙는 정액 특약입니다. 보험기간은 100세 만기({state.profile.age}세 가입 → {rows[0]?.termYears}년), 납입기간은 주계약과 같으며({rows[0]?.payYears}년납), 보장금액을 바꾸면 보험료가 바로 계산됩니다.</p>
       <ul className="space-y-2">
         {rows.map((r) => (
           <li key={r.id} className={`grid grid-cols-[auto_1fr_auto] items-center gap-x-2 gap-y-1 rounded border px-2 py-1.5 text-sm ${r.on ? "border-sky/40 bg-sky/5" : "border-navy/10"}`}>
@@ -37,7 +37,7 @@ export function RidersPanel() {
         <dt className="text-navy/60">특약 합계 ({rows.filter((r) => r.on).length}건)</dt><dd className="font-mono">{won(extra)}</dd>
         <dt className="font-medium text-navy">최종 합계</dt><dd className="font-mono font-medium text-navy">{won(main + extra)}</dd>
       </dl>
-      <p className="mt-2 text-[11px] text-navy/50">&quot;(임시)&quot; 위험률은 회사 요율이 없어 사망률·암발생률에 계수를 곱한 값입니다. 회사 위험률로 교체하면 보험료가 바뀝니다.</p>
+      <p className="mt-2 text-[11px] text-navy/50">암발생률(2024-112호)과 암입원율은 제공받은 값입니다. &quot;(임시)&quot; 위험률은 회사 요율이 없어 사망률·암발생률에 계수를 곱한 값이며 회사 위험률로 교체하면 보험료가 바뀝니다.</p>
     </Card>
   );
 }

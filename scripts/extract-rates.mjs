@@ -24,20 +24,7 @@ function assertTerminal(t, name) {
   for (const sx of ["M", "F"]) for (const k of ["q", "f", "qStd", "fStd"]) if (t[sx][k].length !== ages) throw new Error(`${name}: ragged ${sx}.${k}`);
 }
 
-// 암발생률 — 암보험 산출 워크북(cancer-multi.pygrid.json) 위험률 시트. 사망 시 책임준비금 지급형이라 사망률은 쓰지 않는다(단일탈퇴)
-{
-  const wb = JSON.parse(readFileSync(SRC + "cancer-multi.pygrid.json", "utf8"));
-  const rows = sheetRows(wb, "위험률").filter((r) => r[0] !== undefined && r[0] !== null && r[0] !== "");
-  const ages = col(rows, "나이");
-  const zeros = ages.map(() => 0);
-  const set = (sx) => ({ q: col(rows, `암발생률_${sx}`), f: zeros, qStd: col(rows, `암발생률_${sx}`), fStd: zeros });
-  const out = {
-    meta: { name: "암발생률 (암보험 산출 워크북)", source: "Python_Web_like_Excel cancer-multi.pygrid.json 위험률 시트 · 100세 만기용 terminal 100", ages: [ages[0], ages.at(-1)], terminal: { M: 100, F: 100 } },
-    M: set("남"), F: set("여"),
-  };
-  writeFileSync("lib/engine/data/rates-cancer.json", JSON.stringify(out));
-  console.log("rates-cancer.json", out.M.q.length, "ages");
-}
+// 암발생률·암입원율은 사용자 제공 자료(docs/rates)에서 scripts/build-cancer-rates.mjs 로 만든다
 
 // 제7회 경험생명표 — 경영인정기보험 무배당 1504 산출과정표 위험률 시트
 {

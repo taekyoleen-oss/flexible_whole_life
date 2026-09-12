@@ -35,6 +35,10 @@ describe("특약", () => {
     expect(riderTotal(rows)).toBeCloseTo(dx.monthly + hosp.monthly, 6);
     expect(hosp.monthly).toBeCloseTo(rows0.find((r) => r.id === "hosp")!.monthly * 2, 6);   // 5만 → 10만
     const cancerProduct = reducer(reducer(initialState(), { type: "reset", product: "cancer" }), { type: "rider", id: "stroke", patch: { on: true } });
-    expect(riderPremiums(cancerProduct).find((r) => r.id === "stroke")!.monthly).toBeGreaterThan(0);   // 100세 만기·암보험 가정으로 산출
+    expect(riderPremiums(cancerProduct).find((r) => r.id === "stroke")!.monthly).toBeGreaterThan(0);   // 암보험 가정으로 산출
+    // 사망 담보가 아닌 특약은 주계약과 무관하게 100세 만기(40세 → 60년), 납입은 주계약(20년)
+    expect(rows.every((r) => r.termYears === 60 && r.payYears === 20)).toBe(true);
+    expect(riderPremiums(cancerProduct).every((r) => r.termYears === 60)).toBe(true);
+    expect(hosp.monthly).toBeLessThan(dx.monthly * 20);   // 암입원율 × 365 일수 기준(제공 자료)
   });
 });
