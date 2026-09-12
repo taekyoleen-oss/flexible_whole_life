@@ -1,5 +1,5 @@
 import kli7 from "@/lib/engine/data/rates-kli7.json";
-import { ASSUMPTIONS, buildPreset, PRESETS, compute, DEFAULT_ENVELOPE, expandBlocks, getAssumption, toBlocks, type AssumptionSet, type Block, type DebtMethod, type EngineInput, type EngineResult, type EnvelopeParams, type PresetContext, type PresetId, type RateTable, type Sex } from "@/lib/engine";
+import { addonCurve, ASSUMPTIONS, buildPreset, mergeAddon, PRESETS, type Addon, compute, DEFAULT_ENVELOPE, expandBlocks, getAssumption, toBlocks, type AssumptionSet, type Block, type DebtMethod, type EngineInput, type EngineResult, type EnvelopeParams, type PresetContext, type PresetId, type RateTable, type Sex } from "@/lib/engine";
 import { clamp, roundS0, S0_MAX, S0_MIN, S0_UNIT } from "./format";
 import { presetNeeds } from "./preset-needs";
 export { roundS0, S0_MAX, S0_MIN, S0_UNIT };
@@ -88,6 +88,7 @@ export interface DesignState {
   anchors: number[];     // 그래프에서 직접 정한 변경 연령(오름차순). 이 사이는 매년 한 칸씩 보간된다
   settings: Settings;    // 가정 세트·설계 제약
   infoApplied: InfoApplied; // 입력 정보 중 프리셋 경계에 반영한 항목
+  addons: Addon[];       // 추가 조건(옵션 레이어): 그래프에 별도 선, 결합하면 스케줄에 더해진다
   updatedAt: number;     // 0이면 한 번도 편집하지 않은 기본 상태
 }
 
@@ -135,7 +136,7 @@ export function presetContext(p: Profile, env: EnvelopeParams = DEFAULT_ENVELOPE
 export function initialState(): DesignState {
   return {
     version: 1, profile: DEFAULT_PROFILE, S0: 1e8, payYears: 20, waiver: true, lowSurrender: false,
-    presetId: "level", blocks: buildPreset("level", presetContext(DEFAULT_PROFILE)), anchors: [], settings: DEFAULT_SETTINGS, infoApplied: NO_INFO, updatedAt: 0,
+    presetId: "level", blocks: buildPreset("level", presetContext(DEFAULT_PROFILE)), anchors: [], settings: DEFAULT_SETTINGS, infoApplied: NO_INFO, addons: [], updatedAt: 0,
   };
 }
 export const DEFAULT_STATE: DesignState = initialState();
@@ -165,6 +166,18 @@ export interface LevelBase { S: number[]; anchors: number[] }
 /** 쉼표·공백으로 구분한 나이 목록 → 범위 안의 정수 나이(중복 제거, 오름차순). 축하금 입력용 */
 export const parseAgeList = (text: string, min: number, max: number): number[] =>
   [...new Set(text.split(/[,\s]+/).filter(Boolean).map(Number).filter((a) => Number.isInteger(a) && a >= min && a <= max))].sort((u, v) => u - v);
+
+/** 추가 조건 목록 정리(저장 파일·공유 링크에서 온 값 포함) */
+export function sanitizeAddons(raw: unknown): Addon[] {
+  if (!Array.isArray(raw)) return [];
+  const out: Addon[] = [];
+  for (const r of raw as Partial<Addon>[]) {
+    const kind = r?.kind === "loan" || r?.kind === "fixed" ? r.kind : r?.kind === "education" ? "education" : null;
+    if (!kind || !(Number(r.amount) > 0)) continue;
+    out.push({ id: String(r.id ?? out.length + 1), kind, amount: Math.min(1e10, Number(r.amount)), years: clamp(Math.round(Number(r.years) || 0), 0, 60), childAge: kind === "education" ? clamp(Math.round(Number(r.childAge) || 0), 0, 40) : undefined, label: typeof r.label === "string" ? r.label.slice(0, 40) : undefined });
+  }
+  return out.slice(0, 10);
+}
 
 /** 첫 편집 연령 뒤·최종연령 안의 유효한 변경점만 오름차순으로 */
 export const cleanAnchors = (anchors: unknown, p: Profile, env: EnvelopeParams = DEFAULT_ENVELOPE): number[] =>
@@ -311,6 +324,9 @@ export type Action =
   | { type: "removeCelebration"; index: number }
   | { type: "level"; age: number; multiple: number; base?: LevelBase }
   | { type: "flatten"; age: number }   // 더블클릭: A 이후를 A의 값으로 평탄화
+  | { type: "addAddon"; addon: Addon }
+  | { type: "removeAddon"; id: string }
+  | { type: "mergeAddon"; id: string }   // 결합: 추가 조건을 스케줄에 더하고 목록에서 뺀다
   | { type: "settings"; patch: Partial<Settings> }
   | { type: "applyInfo"; applied: Partial<InfoApplied>; S0?: number; presetId?: PresetId }
   | { type: "resetDesign" }
@@ -332,12 +348,13 @@ export function reducer(s: DesignState, a: Action): DesignState {
       const infoApplied: InfoApplied = { child: ia.child === true, debt: ia.debt === true, retire: ia.retire === true, group: ia.group === true, estate: ia.estate === true, income: ia.income === true };
       merged.infoApplied = infoApplied;
       merged.basePresetId = raw?.basePresetId && raw.basePresetId in PRESETS ? raw.basePresetId : merged.presetId !== "custom" ? merged.presetId : undefined;
+      merged.addons = sanitizeAddons(raw?.addons);
       return { ...withBlocks({ ...merged, payYears, S0, anchors }, deathSegments(blocks), celebrations(blocks)), updatedAt: merged.updatedAt };
     }
     case "reset": return { ...initialState(), settings: s.settings };
     case "resetDesign": {
       // 입력·설정·계약 조건은 두고 설계만 1억·표준 평준형으로. 변경점·축하금·입력 반영도 지운다
-      const next = { ...s, S0: 1e8, anchors: [], infoApplied: NO_INFO, basePresetId: "level" as const };
+      const next = { ...s, S0: 1e8, anchors: [], infoApplied: NO_INFO, basePresetId: "level" as const, addons: [] };
       return withBlocks(next, buildPreset("level", presetContext(s.profile, envelopeOf(s), NO_INFO, assumptionOf(s))), [], "level");
     }
     case "profile": {
@@ -445,6 +462,20 @@ export function reducer(s: DesignState, a: Action): DesignState {
       const same = next.every((v, i) => v === cur[i]) && anchors.length === s.anchors.length && anchors.every((v, i) => v === s.anchors[i]);
       if (same) return s;
       return withBlocks({ ...s, anchors }, toBlocks(next, x), celebrations(s.blocks), "custom");
+    }
+    case "addAddon": {
+      const [a1] = sanitizeAddons([a.addon]);
+      return a1 ? touch({ addons: [...s.addons, a1] }) : s;
+    }
+    case "removeAddon": return touch({ addons: s.addons.filter((x) => x.id !== a.id) });
+    case "mergeAddon": {
+      const add = s.addons.find((x) => x.id === a.id);
+      if (!add) return s;
+      const x = s.profile.age, n = termOf(s.profile);
+      const curve = addonCurve(add, n, assumptionOf(s).needs.independenceAge);
+      const merged = mergeAddon(levels(s), s.S0, curve, envelopeOf(s), S0_UNIT);
+      const next = { ...s, S0: merged.S0, addons: s.addons.filter((y) => y.id !== a.id), anchors: [] };
+      return withBlocks(next, toBlocks(merged.S, x), celebrations(s.blocks), "custom");
     }
     case "flatten": {
       const r = allowedRange(s, a.age);

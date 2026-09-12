@@ -6,6 +6,7 @@ import { Button, Card, onBackdropClick } from "@/components/ui";
 import { won } from "@/lib/format";
 import { STEP } from "@/lib/state";
 import { BudgetFields } from "./budget-panel";
+import { AddonsPanel } from "./addons-panel";
 import { CelebrationBar } from "./celebration-bar";
 import { RulesButton } from "./rules-popup";
 import { ScheduleEditor } from "./schedule-editor";
@@ -34,6 +35,7 @@ export function ScheduleChart() {
       <ScheduleEditor height={400} amount={amount} />
       <p className="mt-1 text-[11px] text-navy/50"><span className="mr-3"><span className="inline-block h-2 w-2 rotate-45 bg-navy align-middle" /> 변경점</span><span className="mr-3"><span className="inline-block h-2 w-3 bg-sky/20 align-middle" /> 초기 고정 구간</span><span><span className="inline-block h-2 w-2 rounded-full bg-sky align-middle" /> 축하금</span></p>
       <CelebrationBar />
+      <AddonsPanel />
       <div className="lg:hidden"><ScaleSection /></div>
       <dialog ref={dlg} className="m-auto w-[min(96vw,1400px)] rounded-lg bg-white p-4 shadow-xl backdrop:bg-navy/50"
         onClick={onBackdropClick}>

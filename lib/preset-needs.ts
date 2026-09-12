@@ -27,20 +27,19 @@ export function presetNeeds(id: PresetId, p: Profile, a: AssumptionSet, table: R
     case "child": {
       if (!p.childrenAges.length) return none("자녀 나이를 입력하세요");
       if (p.income <= 0) return none("연소득을 입력하세요(평준형 입력과 공통)");
-      const raw = childNeedCurve({ income: p.income, childrenAges: p.childrenAges, debt: p.debt, debtYears: p.debtYears, debtRate: p.debtRate, debtMethod: p.debtMethod }, np, n);
+      const raw = childNeedCurve({ income: p.income, childrenAges: p.childrenAges }, np, n);   // 부채는 부채상환형(또는 추가 조건)에서 따로 다룬다
       const off = p.liquidAssets + p.groupCover + p.termCover;   // 이미 있는 자산·보장은 곡선 전체에서 뺀다(비율로 줄이지 않는다)
       const c = raw.map((v) => Math.max(0, v - off));
       if (!(c[0] > 0)) return none("유동자산·기존 보장이 필요액보다 커서 추가 보장이 필요 없습니다");
       const kids = p.childrenAges.filter((x) => x < np.independenceAge).length;
       const youngest = Math.min(...p.childrenAges), tInd = Math.max(0, np.independenceAge - youngest);
-      const living0 = raw[0] - kids * np.educationPerChild - p.debt - np.finalExpense;
+      const living0 = raw[0] - kids * np.educationPerChild - np.finalExpense;
       const ti = Math.min(n - 1, tInd);
       return {
         available: true, target: c.map((v) => v / c[0]), baseNeed: c[0], proposedS0: roundS0(c[0]),
         figures: [
           [`유족 생활비 현가 (연소득 × ${Math.round(np.livingRatio * 100)}% × a(${tInd}년, ${np.discount * 100}%))`, won(Math.round(living0))],
           [`교육·결혼 자금 (독립 전 ${kids}명 × ${won(np.educationPerChild)})`, won(kids * np.educationPerChild)],
-          ...(p.debt > 0 ? [["부채 잔액 (부채상환형 입력과 공통)", won(p.debt)] as [string, string]] : []),
           ["정리자금", won(np.finalExpense)],
           ["− 유동자산·기존 보장", `−${won(off)}`],
           ["현재 필요액 (기준액 = 기준보험금 제안)", won(Math.round(c[0]))],

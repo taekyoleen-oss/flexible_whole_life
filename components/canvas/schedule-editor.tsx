@@ -2,7 +2,9 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { useDesign } from "@/components/design-provider";
 import { won, wonShort } from "@/lib/format";
-import { allowedRange, celebrations, endAgeOf, envelopeOf, firstEditableAge, STEP, type LevelBase } from "@/lib/state";
+import { addonCurve, addonLabel } from "@/lib/engine";
+import { allowedRange, assumptionOf, celebrations, endAgeOf, envelopeOf, firstEditableAge, STEP, type LevelBase } from "@/lib/state";
+import { ADDON_COLORS } from "./addons-panel";
 
 const M = { left: 64, right: 16, top: 18, bottom: 28 };
 const r4 = (x: number) => Math.round(x * 1e4) / 1e4;
@@ -37,7 +39,9 @@ export function ScheduleEditor({ height, amount, readOnly = false }: { height: n
   const x0 = state.profile.age, n = result.n, S = result.S, S0 = state.S0;
   const env = envelopeOf(state);
   const first = firstEditableAge(state.profile, env), endAge = endAgeOf(state.profile);
-  const yMax = Math.max(env.maxMultiple, Math.ceil((Math.max(...S) + 0.3) * 2) / 2);
+  // 추가 조건은 원 단위 곡선을 기준보험금 배수로 환산해 별도 선으로 그린다(결합 전에는 스케줄에 영향 없음)
+  const addons = state.addons.map((a, i) => ({ a, color: ADDON_COLORS[i % ADDON_COLORS.length], m: addonCurve(a, n, assumptionOf(state).needs.independenceAge).map((v) => v / S0) }));
+  const yMax = Math.max(env.maxMultiple, Math.ceil((Math.max(...S, ...addons.flatMap((x) => x.m)) + 0.3) * 2) / 2);
   const W = Math.max(width, 320), H = height;
   const pw = W - M.left - M.right, ph = H - M.top - M.bottom;
   const xs = (age: number) => M.left + ((age - x0) / n) * pw;
@@ -123,6 +127,15 @@ export function ScheduleEditor({ height, amount, readOnly = false }: { height: n
         ))}
         <path d={area} fill="#1b2845" fillOpacity={0.06} />
         <path d={line} fill="none" stroke="#1b2845" strokeWidth={2.5} />
+        {addons.map(({ a, color, m }) => {
+          const d = m.map((v, t) => `${t === 0 ? "M" : "L"}${xs(x0 + t)},${ys(v)} L${xs(x0 + t + 1)},${ys(v)}`).join(" ");
+          return (
+            <g key={a.id}>
+              <path d={d} fill="none" stroke={color} strokeWidth={2} strokeDasharray="6 3" />
+              <text x={xs(x0) + 6} y={ys(m[0]) - 6} fontSize={11} fill={color} {...halo}>{addonLabel(a)} {label(m[0])}</text>
+            </g>
+          );
+        })}
         {state.anchors.map((a) => (
           <rect key={a} x={xs(a) - 4} y={ys(at(a)) - 4} width={8} height={8} transform={`rotate(45 ${xs(a)} ${ys(at(a))})`} fill="#1b2845" stroke="#fff" strokeWidth={1.5}>
             <title>{a}세 변경점</title>
