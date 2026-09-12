@@ -20,14 +20,29 @@ export interface MergeRecord { beforeS: number[]; beforeS0: number; beforeAnchor
 
 export const ADDON_LABEL: Record<AddonKind, string> = { education: "자녀교육", loan: "대출상환", fixed: "정액 보장" };
 
-/** 추가 조건의 연도별 필요액(원, 길이 n). 감소형은 지금부터 기간 동안 직선으로 0까지 */
-export function addonCurve(a: Addon, n: number, independenceAge = 25): number[] {
+/**
+ * 추가 조건의 연도별 필요액(원, 길이 n).
+ * 자녀교육: 지금부터 독립까지 직선으로 0까지. 대출상환: 초기 고정 기간(fixYears, E01)은 정액, 그 뒤 만기까지 직선 감액. 정액: 기간 동안 같은 금액
+ */
+export function addonCurve(a: Addon, n: number, independenceAge = 25, fixYears = 5): number[] {
   const years = a.kind === "education" ? Math.max(0, independenceAge - (a.childAge ?? independenceAge)) : Math.max(0, a.years);
   return Array.from({ length: n }, (_, t) => {
     if (a.kind === "fixed") return t < years ? a.amount : 0;
     if (years <= 0 || t >= years) return 0;
+    if (a.kind === "loan") {
+      const flat = Math.min(fixYears, years);
+      return t < flat ? a.amount : a.amount * ((years - t) / (years - flat));   // 1~5년 정액, 6년째부터 만기까지 감액
+    }
     return a.amount * (1 - t / years);   // 남은 기간에 비례해 줄어든다
   });
+}
+
+/** 목록에 보이는 모양 설명 */
+export function addonShape(a: Addon, independenceAge = 25, fixYears = 5): string {
+  if (a.kind === "fixed") return `${a.years}년간 정액`;
+  if (a.kind === "education") return `독립까지 ${Math.max(0, independenceAge - (a.childAge ?? independenceAge))}년 감액`;
+  const flat = Math.min(fixYears, a.years);
+  return a.years > flat ? `1~${flat}년 정액, ${flat + 1}~${a.years}년 감액` : `1~${a.years}년 정액 후 0`;
 }
 
 export function addonLabel(a: Addon): string {

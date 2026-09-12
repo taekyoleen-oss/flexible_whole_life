@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addonCurve, mergeAddon } from "@/lib/engine/addons";
+import { addonCurve, addonShape, mergeAddon } from "@/lib/engine/addons";
 import { DEFAULT_ENVELOPE } from "@/lib/engine/envelope";
 import { canUnmerge, initialState, levels, reducer } from "@/lib/state";
 
@@ -8,9 +8,13 @@ describe("추가 조건", () => {
     const c = addonCurve({ id: "a", kind: "education", amount: 1e8, years: 0, childAge: 10 }, 30);
     expect(c[0]).toBe(1e8); expect(c[5]).toBeCloseTo(1e8 * (10 / 15), 6); expect(c[15]).toBe(0); expect(c[29]).toBe(0);
   });
-  it("대출상환: 대출금이 상환기간 동안 지금부터 감소, 정액은 기간 동안 같은 금액", () => {
+  it("대출상환: 1~5년 정액, 6년째부터 만기까지 직선 감액, 정액은 기간 동안 같은 금액", () => {
     const l = addonCurve({ id: "b", kind: "loan", amount: 3e8, years: 15 }, 30);
-    expect(l[0]).toBe(3e8); expect(l[7]).toBeCloseTo(3e8 * (8 / 15), 6); expect(l[15]).toBe(0);
+    expect(l[0]).toBe(3e8); expect(l[4]).toBe(3e8); expect(l[5]).toBe(3e8); expect(l[10]).toBeCloseTo(3e8 * (5 / 10), 6); expect(l[15]).toBe(0);
+    const ten = addonCurve({ id: "b2", kind: "loan", amount: 1e8, years: 10 }, 20);
+    expect(ten.slice(0, 5)).toEqual([1e8, 1e8, 1e8, 1e8, 1e8]); expect(ten[5]).toBe(1e8); expect(ten[8]).toBeCloseTo(1e8 * (2 / 5), 6); expect(ten[10]).toBe(0);
+    expect(addonShape({ id: "b2", kind: "loan", amount: 1e8, years: 10 })).toBe("1~5년 정액, 6~10년 감액");
+    expect(addonShape({ id: "b3", kind: "loan", amount: 1e8, years: 4 })).toBe("1~4년 정액 후 0");
     const f = addonCurve({ id: "c", kind: "fixed", amount: 5e7, years: 10 }, 30);
     expect(f[0]).toBe(5e7); expect(f[9]).toBe(5e7); expect(f[10]).toBe(0);
   });

@@ -485,7 +485,7 @@ export function reducer(s: DesignState, a: Action): DesignState {
       const add = s.addons.find((x) => x.id === a.id);
       if (!add) return s;
       const x = s.profile.age, n = termOf(s.profile);
-      const curve = addonCurve(add, n, assumptionOf(s).needs.independenceAge);
+      const curve = addonCurve(add, n, assumptionOf(s).needs.independenceAge, envelopeOf(s).fixYears);
       if (add.merged) return s;
       const before = levels(s);
       const merged = mergeAddon(before, s.S0, curve, envelopeOf(s), S0_UNIT);
