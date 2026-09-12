@@ -53,6 +53,17 @@ export function NumInput({ value, onCommit, ...rest }: Omit<InputHTMLAttributes<
 }
 
 /** 만원 단위 입력. value·onChange는 원. min/max/step은 만원. */
+/** 백만원 단위 입력(소수 1자리 = 십만원). value·onChange는 원. min/max는 백만원 */
+export function MillionInput({ value, onChange, min = 0, max = 1e5, step = 1 }: { value: number; onChange: (won: number) => void; min?: number; max?: number; step?: number }) {
+  return (
+    <div className="flex items-center gap-1">
+      <NumInput value={Math.round(value / 1e5) / 10} min={min} max={max} step={step} inputMode="decimal"
+        onCommit={(n) => onChange(clamp(Math.round(n * 10) * 1e5, min * 1e6, max * 1e6))} />
+      <span className="shrink-0 text-sm text-navy/60">백만원</span>
+    </div>
+  );
+}
+
 export function ManwonInput({ value, onChange, min = 0, max = 1e6, step = 1 }: { value: number; onChange: (won: number) => void; min?: number; max?: number; step?: number }) {
   return (
     <div className="flex items-center gap-1">

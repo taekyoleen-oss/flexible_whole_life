@@ -40,7 +40,7 @@ export function ScheduleEditor({ height, amount, readOnly = false }: { height: n
   const env = envelopeOf(state);
   const first = firstEditableAge(state.profile, env), endAge = endAgeOf(state.profile);
   // 추가 조건은 원 단위 곡선을 기준보험금 배수로 환산해 별도 선으로 그린다(결합 전에는 스케줄에 영향 없음)
-  const addons = state.addons.map((a, i) => ({ a, color: ADDON_COLORS[i % ADDON_COLORS.length], m: addonCurve(a, n, assumptionOf(state).needs.independenceAge).map((v) => v / S0) }));
+  const addons = state.addons.map((a, i) => ({ a, color: ADDON_COLORS[i % ADDON_COLORS.length], m: addonCurve(a, n, assumptionOf(state).needs.independenceAge).map((v) => v / S0) })).filter((x) => !x.a.merged);   // 결합된 항목은 스케줄에 들어 있으므로 따로 그리지 않는다
   const yMax = Math.max(env.maxMultiple, Math.ceil((Math.max(...S, ...addons.flatMap((x) => x.m)) + 0.3) * 2) / 2);
   const W = Math.max(width, 320), H = height;
   const pw = W - M.left - M.right, ph = H - M.top - M.bottom;

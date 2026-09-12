@@ -2,10 +2,10 @@
 import { useRef, useState } from "react";
 import { useDesign } from "@/components/design-provider";
 import { FormulaHelp } from "@/components/formula-help";
-import { Button, Field, ManwonInput, NumInput, Select, onBackdropClick } from "@/components/ui";
+import { Button, Field, MillionInput, NumInput, Select, onBackdropClick } from "@/components/ui";
 import { ADDON_LABEL, addonCurve, addonLabel, type Addon, type AddonKind } from "@/lib/engine";
 import { won } from "@/lib/format";
-import { assumptionOf } from "@/lib/state";
+import { assumptionOf, canUnmerge } from "@/lib/state";
 
 export const ADDON_COLORS = ["#c2704a", "#2a9d8f", "#8e44ad", "#d4a017", "#e76f51"];
 
@@ -35,12 +35,15 @@ export function AddonsPanel() {
             const c = addonCurve(a, result.n, indep);
             return (
               <li key={a.id} className="flex flex-wrap items-center gap-2">
-                <span className="inline-block h-2 w-4 rounded" style={{ background: ADDON_COLORS[i % ADDON_COLORS.length] }} />
+                <span className="inline-block h-2 w-4 rounded" style={{ background: ADDON_COLORS[i % ADDON_COLORS.length], opacity: a.merged ? 0.35 : 1 }} />
                 <span className="font-medium text-navy">{addonLabel(a)}</span>
                 <span className="text-xs text-navy/60">{ADDON_LABEL[a.kind]} · 최초 {won(c[0])} → {a.kind === "fixed" ? `${a.years}년간 정액` : `${Math.max(0, c.findIndex((v) => v <= 0))}년 뒤 0`}</span>
+                {a.merged && <span className="rounded bg-sky/10 px-1.5 text-xs text-sky">결합됨</span>}
                 <span className="ml-auto flex gap-1">
-                  <Button onClick={() => { if (confirm(`"${addonLabel(a)}"을(를) 기본 그래프에 더합니다. 기준보험금이 3배 상한을 넘으면 올라가고, 설계 규칙(초기 고정·매년 1칸)에 맞춰집니다.`)) dispatch({ type: "mergeAddon", id: a.id }); }}>결합</Button>
-                  <Button onClick={() => dispatch({ type: "removeAddon", id: a.id })}>삭제</Button>
+                  {a.merged
+                    ? <Button disabled={!canUnmerge(state, a)} title={canUnmerge(state, a) ? "결합 전 그래프로 되돌립니다" : "결합 뒤 그래프나 기준보험금을 바꿔 분리할 수 없습니다(되돌리기로만 취소 가능)"} onClick={() => dispatch({ type: "unmergeAddon", id: a.id })}>분리</Button>
+                    : <Button onClick={() => { if (confirm(`"${addonLabel(a)}"을(를) 기본 그래프에 더합니다. 기준보험금이 3배 상한을 넘으면 올라가고, 설계 규칙(초기 고정·매년 1칸)에 맞춰집니다. 그래프를 바꾸기 전까지는 "분리"로 되돌릴 수 있습니다.`)) dispatch({ type: "mergeAddon", id: a.id }); }}>결합</Button>}
+                  <Button onClick={() => dispatch({ type: "removeAddon", id: a.id })} title={a.merged ? "결합 기록만 지웁니다(그래프는 그대로)" : "항목을 지웁니다"}>삭제</Button>
                 </span>
               </li>
             );
@@ -52,7 +55,7 @@ export function AddonsPanel() {
         <p className="mt-1 text-xs text-navy/60">자녀교육: 1인당 최초 금액이 독립({indep}세)까지 매년 줄어듭니다. 대출상환: 대출금이 상환기간 동안 지금부터 직선으로 줄어듭니다. 정액: 기간 동안 같은 금액.</p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <Field label="종류"><Select value={kind} onChange={(e) => setKind(e.target.value as AddonKind)}>{(Object.keys(ADDON_LABEL) as AddonKind[]).map((k) => <option key={k} value={k}>{ADDON_LABEL[k]}</option>)}</Select></Field>
-          <Field label={kind === "education" ? "자녀 1인당 최초 금액" : kind === "loan" ? "대출금" : "보장 금액"}><ManwonInput value={amount} onChange={setAmount} min={100} max={1e6} step={100} /></Field>
+          <Field label={kind === "education" ? "자녀 1인당 최초 금액" : kind === "loan" ? "대출금" : "보장 금액"}><MillionInput value={amount} onChange={setAmount} min={1} max={1e4} step={1} /></Field>
           {kind === "education"
             ? <Field label="자녀 나이" hint={`독립까지 ${Math.max(0, indep - childAge)}년 동안 감소`}><div className="flex items-center gap-1"><NumInput value={childAge} min={0} max={indep} onCommit={(v) => setChildAge(Math.round(v))} /><span className="text-sm text-navy/60">세</span></div></Field>
             : <Field label={kind === "loan" ? "상환기간 (년)" : "보장 기간 (년)"}><NumInput value={years} min={1} max={60} onCommit={(v) => setYears(Math.round(v))} /></Field>}

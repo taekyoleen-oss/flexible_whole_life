@@ -1,5 +1,5 @@
 import kli7 from "@/lib/engine/data/rates-kli7.json";
-import { addonCurve, ASSUMPTIONS, buildPreset, mergeAddon, PRESETS, type Addon, compute, DEFAULT_ENVELOPE, expandBlocks, getAssumption, toBlocks, type AssumptionSet, type Block, type DebtMethod, type EngineInput, type EngineResult, type EnvelopeParams, type PresetContext, type PresetId, type RateTable, type Sex } from "@/lib/engine";
+import { addonCurve, ASSUMPTIONS, buildPreset, mergeAddon, PRESETS, type Addon, type MergeRecord, compute, DEFAULT_ENVELOPE, expandBlocks, getAssumption, toBlocks, type AssumptionSet, type Block, type DebtMethod, type EngineInput, type EngineResult, type EnvelopeParams, type PresetContext, type PresetId, type RateTable, type Sex } from "@/lib/engine";
 import { clamp, roundS0, S0_MAX, S0_MIN, S0_UNIT } from "./format";
 import { presetNeeds } from "./preset-needs";
 export { roundS0, S0_MAX, S0_MIN, S0_UNIT };
@@ -167,6 +167,14 @@ export interface LevelBase { S: number[]; anchors: number[] }
 export const parseAgeList = (text: string, min: number, max: number): number[] =>
   [...new Set(text.split(/[,\s]+/).filter(Boolean).map(Number).filter((a) => Number.isInteger(a) && a >= min && a <= max))].sort((u, v) => u - v);
 
+/** 결합 뒤 그래프·기준보험금을 바꾸지 않았을 때만 분리할 수 있다 */
+export function canUnmerge(s: DesignState, add: Addon): boolean {
+  const r = add.merged;
+  if (!r || r.afterS0 !== s.S0) return false;
+  const cur = levels(s);
+  return cur.length === r.afterS.length && cur.every((v, i) => Math.abs(v - r.afterS[i]) < 1e-9);
+}
+
 /** 추가 조건 목록 정리(저장 파일·공유 링크에서 온 값 포함) */
 export function sanitizeAddons(raw: unknown): Addon[] {
   if (!Array.isArray(raw)) return [];
@@ -174,7 +182,11 @@ export function sanitizeAddons(raw: unknown): Addon[] {
   for (const r of raw as Partial<Addon>[]) {
     const kind = r?.kind === "loan" || r?.kind === "fixed" ? r.kind : r?.kind === "education" ? "education" : null;
     if (!kind || !(Number(r.amount) > 0)) continue;
-    out.push({ id: String(r.id ?? out.length + 1), kind, amount: Math.min(1e10, Number(r.amount)), years: clamp(Math.round(Number(r.years) || 0), 0, 60), childAge: kind === "education" ? clamp(Math.round(Number(r.childAge) || 0), 0, 40) : undefined, label: typeof r.label === "string" ? r.label.slice(0, 40) : undefined });
+    const m = r.merged as Partial<MergeRecord> | undefined;
+    const nums = (v: unknown) => (Array.isArray(v) && v.every((x) => Number.isFinite(x)) ? (v as number[]) : null);
+    const merged = m && nums(m.beforeS) && nums(m.afterS) && Number.isFinite(m.beforeS0) && Number.isFinite(m.afterS0)
+      ? { beforeS: nums(m.beforeS)!, beforeS0: Number(m.beforeS0), beforeAnchors: nums(m.beforeAnchors) ?? [], beforePreset: String(m.beforePreset ?? "custom"), afterS: nums(m.afterS)!, afterS0: Number(m.afterS0) } : undefined;
+    out.push({ id: String(r.id ?? out.length + 1), kind, amount: Math.min(1e10, Number(r.amount)), years: clamp(Math.round(Number(r.years) || 0), 0, 60), childAge: kind === "education" ? clamp(Math.round(Number(r.childAge) || 0), 0, 40) : undefined, label: typeof r.label === "string" ? r.label.slice(0, 40) : undefined, merged });
   }
   return out.slice(0, 10);
 }
@@ -326,7 +338,8 @@ export type Action =
   | { type: "flatten"; age: number }   // 더블클릭: A 이후를 A의 값으로 평탄화
   | { type: "addAddon"; addon: Addon }
   | { type: "removeAddon"; id: string }
-  | { type: "mergeAddon"; id: string }   // 결합: 추가 조건을 스케줄에 더하고 목록에서 뺀다
+  | { type: "mergeAddon"; id: string }   // 결합: 추가 조건을 스케줄에 더한다(되돌리기 정보를 보관)
+  | { type: "unmergeAddon"; id: string }   // 분리: 결합 뒤 그래프를 바꾸지 않았으면 결합 전으로
   | { type: "settings"; patch: Partial<Settings> }
   | { type: "applyInfo"; applied: Partial<InfoApplied>; S0?: number; presetId?: PresetId }
   | { type: "resetDesign" }
@@ -473,9 +486,20 @@ export function reducer(s: DesignState, a: Action): DesignState {
       if (!add) return s;
       const x = s.profile.age, n = termOf(s.profile);
       const curve = addonCurve(add, n, assumptionOf(s).needs.independenceAge);
-      const merged = mergeAddon(levels(s), s.S0, curve, envelopeOf(s), S0_UNIT);
-      const next = { ...s, S0: merged.S0, addons: s.addons.filter((y) => y.id !== a.id), anchors: [] };
+      if (add.merged) return s;
+      const before = levels(s);
+      const merged = mergeAddon(before, s.S0, curve, envelopeOf(s), S0_UNIT);
+      const rec: MergeRecord = { beforeS: before, beforeS0: s.S0, beforeAnchors: s.anchors, beforePreset: s.presetId, afterS: merged.S, afterS0: merged.S0 };
+      const next = { ...s, S0: merged.S0, addons: s.addons.map((y) => (y.id === a.id ? { ...y, merged: rec } : y)), anchors: [] };
       return withBlocks(next, toBlocks(merged.S, x), celebrations(s.blocks), "custom");
+    }
+    case "unmergeAddon": {
+      const add = s.addons.find((x) => x.id === a.id);
+      if (!add?.merged || !canUnmerge(s, add)) return s;
+      const r = add.merged, x = s.profile.age;
+      const presetId = (r.beforePreset in PRESETS ? r.beforePreset : "custom") as DesignState["presetId"];
+      const next = { ...s, S0: r.beforeS0, anchors: cleanAnchors(r.beforeAnchors, s.profile, envelopeOf(s)), addons: s.addons.map((y) => (y.id === a.id ? { ...y, merged: undefined } : y)) };
+      return withBlocks(next, toBlocks(r.beforeS, x), celebrations(s.blocks), presetId);
     }
     case "flatten": {
       const r = allowedRange(s, a.age);

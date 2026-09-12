@@ -13,7 +13,10 @@ export interface Addon {
   years: number;        // loan: 상환기간, fixed: 보장 기간(년). education은 독립 연령 − 자녀 나이
   childAge?: number;    // education
   label?: string;
+  merged?: MergeRecord;   // 결합된 뒤 보관하는 되돌리기 정보(그래프를 바꾸지 않았으면 분리 가능)
 }
+/** 결합 직전·직후 스냅샷. after와 현재 스케줄이 같을 때만 분리할 수 있다 */
+export interface MergeRecord { beforeS: number[]; beforeS0: number; beforeAnchors: number[]; beforePreset: string; afterS: number[]; afterS0: number }
 
 export const ADDON_LABEL: Record<AddonKind, string> = { education: "자녀교육", loan: "대출상환", fixed: "정액 보장" };
 
