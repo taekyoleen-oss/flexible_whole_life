@@ -25,10 +25,10 @@ export default function Home() {
             ["whole", "종신보험", "사망보험금을 연령별로 설계합니다. 종신 보장, 제7회 경험생명표·납입면제 이중탈퇴, 저해지 선택.", "기준 사망보험금 1억"],
             ["cancer", "암보험", "암진단보험금을 연령별로 설계합니다. 100세 만기, 암발생률 기준 산출, 사망 시에는 책임준비금을 지급합니다(90일 면책은 첫해 급부 3/4로 반영).", "기준 암진단보험금 1억"],
           ] as const).map(([id, name, desc, base]) => (
-            <Card key={id} title={<span className="flex items-center justify-between gap-2">{name}<span className="rounded bg-navy/5 px-2 py-0.5 font-sans text-xs font-normal text-navy/70">{base}</span></span>}>
+            <Card key={id} className="flex flex-col" title={<span className="flex items-center justify-between gap-2">{name}<span className="rounded bg-navy/5 px-2 py-0.5 font-sans text-xs font-normal text-navy/70">{base}</span></span>}>
               <p className="text-sm text-navy/70">{desc}</p>
-              <p className="mt-1 text-xs text-navy/50">프리셋·그래프 편집·추가 조건·검증·산출은 두 상품이 같습니다.</p>
-              <Button primary className="mt-3" onClick={() => { if (hasSaved && !confirm("현재 설계를 지우고 새로 시작합니다. 보관함에 저장하지 않은 설계는 사라집니다.")) return; dispatch({ type: "reset", product: id }); router.push("/design"); }}>{name} 설계 시작</Button>
+              <p className="mb-3 mt-1 text-xs text-navy/50">프리셋·그래프 편집·추가 조건·검증·산출은 두 상품이 같습니다.</p>
+              <Button primary className="mt-auto self-start" onClick={() => { if (hasSaved && !confirm("현재 설계를 지우고 새로 시작합니다. 보관함에 저장하지 않은 설계는 사라집니다.")) return; dispatch({ type: "reset", product: id }); router.push("/design"); }}>{name} 설계 시작</Button>
             </Card>
           ))}
         </div>
@@ -38,9 +38,9 @@ export default function Home() {
         <h2 className="mb-3 font-display text-xl text-navy">샘플 설계</h2>
         <div className="grid gap-4 md:grid-cols-3">
           {SAMPLES.map((s) => (
-            <Card key={s.id} title={s.label}>
-              <p className="text-sm text-navy/70">{s.description}</p>
-              <Button className="mt-3" onClick={() => { dispatch({ type: "load", state: buildSample(s) }); router.push("/design"); }}>열기</Button>
+            <Card key={s.id} className="flex flex-col" title={s.label}>
+              <p className="mb-3 text-sm text-navy/70">{s.description}</p>
+              <Button className="mt-auto self-start" onClick={() => { dispatch({ type: "load", state: buildSample(s) }); router.push("/design"); }}>열기</Button>
             </Card>
           ))}
         </div>
