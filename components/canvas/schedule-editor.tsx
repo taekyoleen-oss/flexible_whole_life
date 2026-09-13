@@ -5,6 +5,7 @@ import { won, wonShort } from "@/lib/format";
 import { addonCurve, addonLabel } from "@/lib/engine";
 import { allowedRange, assumptionOf, celebrations, endAgeOf, envelopeOf, firstEditableAge, STEP, type LevelBase } from "@/lib/state";
 import { ADDON_COLORS } from "./addons-panel";
+import { milestones } from "@/lib/milestones";
 
 const M = { left: 64, right: 16, top: 18, bottom: 28 };
 const r4 = (x: number) => Math.round(x * 1e4) / 1e4;
@@ -40,6 +41,7 @@ export function ScheduleEditor({ height, amount, readOnly = false }: { height: n
   const env = envelopeOf(state);
   const first = firstEditableAge(state.profile, env), endAge = endAgeOf(state.profile);
   // 추가 조건은 원 단위 곡선을 기준보험금 배수로 환산해 별도 선으로 그린다(결합 전에는 스케줄에 영향 없음)
+  const marks = milestones(state);   // 프리셋 근거 시점(자녀 독립·은퇴·대출 종료 등)을 다른 색 글자로
   const addons = state.addons.map((a, i) => ({ a, color: ADDON_COLORS[i % ADDON_COLORS.length], m: addonCurve(a, n, assumptionOf(state).needs.independenceAge, env.fixYears).map((v) => v / S0) })).filter((x) => !x.a.merged);   // 결합된 항목은 스케줄에 들어 있으므로 따로 그리지 않는다
   const yMax = Math.max(env.maxMultiple, Math.ceil((Math.max(...S, ...addons.flatMap((x) => x.m)) + 0.3) * 2) / 2);
   const W = Math.max(width, 320), H = height;
@@ -142,6 +144,17 @@ export function ScheduleEditor({ height, amount, readOnly = false }: { height: n
           </rect>
         ))}
         <text x={xs(x0) + 6} y={M.top + 14} fontSize={11} fill="#1b2845" {...halo}>초기 고정 {x0}~{first - 1}세</text>
+        {marks.map((mk, i) => {
+          const color = mk.kind === "addon" ? "#c2704a" : "#8e44ad";
+          const x = xs(mk.age), yText = M.top + 30 + (i % 3) * 13;   // 가까운 시점끼리 겹치지 않게 세 줄로 나눠 놓는다
+          const left = mk.anchor === "start" || x > W - 150;   // 오른쪽 끝에서는 왼쪽으로 쓴다
+          return (
+            <g key={`${mk.kind}-${mk.age}-${mk.label}`}>
+              {mk.anchor !== "start" && <line x1={x} x2={x} y1={M.top + 22} y2={M.top + ph} stroke={color} strokeOpacity={0.6} strokeDasharray="2 3" />}
+              <text x={mk.anchor === "start" ? x + 6 : left ? x - 4 : x + 4} y={yText} fontSize={11} fontWeight={600} fill={color} textAnchor={mk.anchor === "start" ? "start" : left ? "end" : "start"} {...halo}>{mk.label}</text>
+            </g>
+          );
+        })}
         {cels.map((c) => (
           <g key={c.fromAge}>
             <circle cx={xs(c.fromAge)} cy={ys(at(c.fromAge))} r={6} fill="#4a90c2" stroke="#fff" strokeWidth={2} />
